@@ -53,6 +53,8 @@ type NewOrderMsgItem struct {
 }
 
 type OrderRejectedMsg struct {
-	OrderID    uint  `json:"order_id"`
-	ReasonCode uint8 `json:"reason_code"`
+	OrderID    uint    `json:"order_id"`
+	UserID     uint    `json:"user_id"`
+	Cost       float32 `json:"cost"`
+	ReasonCode uint8   `json:"reason_code"`
 }

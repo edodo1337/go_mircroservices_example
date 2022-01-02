@@ -41,8 +41,16 @@ func (dao *PostgresWalletsDAO) UpdateBalance(ctx context.Context, wallet *models
 	return &updatedWallet, err
 }
 
+func (dao *PostgresWalletsDAO) HealthCheck(ctx context.Context) error {
+	if err := dao.db.Ping(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func NewPostgresWalletsDAO(ctx context.Context, config *conf.Config) *PostgresWalletsDAO {
-	dbConn := GetPostgresConnection(ctx, config.RegistryDatabaseURI())
+	dbConn := GetPostgresConnection(ctx, config.WalletDatabaseURI())
 
 	if !migrationsApplied {
 		err := Migrate(ctx, dbConn)
@@ -60,20 +68,7 @@ func NewPostgresWalletsDAO(ctx context.Context, config *conf.Config) *PostgresWa
 			WHERE id=$2::bigint;`,
 	}
 
-	tx, err := dbConn.Begin(ctx)
-	if err != nil {
-		panic(err)
-	}
-
-	for k, v := range queriesMap {
-		if _, err := tx.Prepare(ctx, k, v); err != nil {
-			panic(err)
-		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		panic(err)
-	}
+	submitPreparedStatements(ctx, queriesMap, dbConn)
 
 	return &PostgresWalletsDAO{
 		db:           dbConn,
@@ -102,15 +97,18 @@ func (dao *PostgresTransactionsDAO) GetByOrderID(ctx context.Context, orderID ui
 	return &trans, err
 }
 
-func (dao *PostgresTransactionsDAO) Create(ctx context.Context, transData *in.CreateWalletTransactionDTO) (*models.WalletTransaction, error) {
+func (dao *PostgresTransactionsDAO) Create(
+	ctx context.Context,
+	data *in.CreateWalletTransactionDTO,
+) (*models.WalletTransaction, error) {
 	var trans models.WalletTransaction
 	err := dao.db.QueryRow(
 		ctx,
 		"create_transaction",
-		transData.WalletID,
-		transData.OrderID,
-		transData.Cost,
-		transData.Type,
+		data.WalletID,
+		data.OrderID,
+		data.Cost,
+		data.Type,
 	).Scan(
 		trans.ID,
 		trans.WalletID,
@@ -122,8 +120,16 @@ func (dao *PostgresTransactionsDAO) Create(ctx context.Context, transData *in.Cr
 	return &trans, err
 }
 
+func (dao *PostgresTransactionsDAO) HealthCheck(ctx context.Context) error {
+	if err := dao.db.Ping(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func NewPostgresWalletTransDAO(ctx context.Context, config *conf.Config) *PostgresTransactionsDAO {
-	dbConn := GetPostgresConnection(ctx, config.RegistryDatabaseURI())
+	dbConn := GetPostgresConnection(ctx, config.WalletDatabaseURI())
 
 	if !migrationsApplied {
 		err := Migrate(ctx, dbConn)
@@ -141,20 +147,7 @@ func NewPostgresWalletTransDAO(ctx context.Context, config *conf.Config) *Postgr
 			VALUES ($1::bigint, $2::bigint, $3::decimal, $4::smallint);`,
 	}
 
-	tx, err := dbConn.Begin(ctx)
-	if err != nil {
-		panic(err)
-	}
-
-	for k, v := range queriesMap {
-		if _, err := tx.Prepare(ctx, k, v); err != nil {
-			panic(err)
-		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		panic(err)
-	}
+	submitPreparedStatements(ctx, queriesMap, dbConn)
 
 	return &PostgresTransactionsDAO{
 		db:                dbConn,

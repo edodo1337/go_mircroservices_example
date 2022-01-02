@@ -2,23 +2,26 @@
 server:
   # host: "0.0.0.0"
   host: "localhost"
-  port: 8000
-  prefix: "registry"
-  wallets_table: "wallets"
-  transactions_table: "wallet_transactions"
+  port: 8001
+  prefix: "wallet"
   jwt_access_secret: "epstein didnt kill himself"
   jwt_refresh_secret: "epstein didnt kill himself"
   transactions_pipe_cap: 100
 
 # Database credentials
 wallet_database:
+  host: "localhost"
   user: "user"
   password: "password"
+  db_name: "mydb"
+  wallets_table: "wallets"
+  transactions_table: "wallet_transactions"
+
 
 # Kafka configs
 kafka:
   new_orders_topic: "new_orders"
-  rejected_orders_topic: "rejected_orders_topic"
+  rejected_orders_topic: "rejected_orders"
   group_id: "wallet"
   external_clients_port: 9092
   internal_clients_port: 9093

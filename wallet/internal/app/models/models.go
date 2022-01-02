@@ -1,6 +1,10 @@
 package models
 
-type OrderStatus uint8
+type (
+	OrderStatus       uint8
+	TransactionType   uint8
+	CancelationReason uint8
+)
 
 const (
 	Pending OrderStatus = iota
@@ -9,11 +13,15 @@ const (
 	Rejected
 )
 
-type TransactionType uint8
-
 const (
 	Purchase TransactionType = iota
 	Cancelation
+)
+
+const (
+	NotEnoughMoney CancelationReason = iota
+	OutOfStock
+	InternalError
 )
 
 type Wallet struct {

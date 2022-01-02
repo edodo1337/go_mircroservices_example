@@ -1,0 +1,11 @@
+{
+    "go.lintTool":"golangci-lint",
+    "gopls": {
+        "formatting.gofumpt": true
+    },
+    "go.lintFlags": [
+        "--config=${workspaceFolder}/.golangci.yml",
+        "--issues-exit-code=0"
+    ],
+    "editor.formatOnSave": true
+}

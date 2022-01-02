@@ -2,7 +2,11 @@ package models
 
 import "time"
 
-type OrderStatus uint8
+type (
+	OrderStatus       uint8
+	TransactionType   uint8
+	CancelationReason uint8
+)
 
 const (
 	Pending OrderStatus = iota
@@ -11,13 +15,24 @@ const (
 	Rejected
 )
 
+const (
+	Purchase TransactionType = iota
+	Cancelation
+)
+
+const (
+	NotEnoughMoney CancelationReason = iota
+	OutOfStock
+	InternalError
+)
+
 type Order struct {
 	ID             uint
 	UserID         uint
 	CreatedAt      time.Time
 	Status         OrderStatus
 	OrderItems     []*OrderItem
-	RejectedReason uint8
+	RejectedReason CancelationReason
 }
 
 type OrderItem struct {

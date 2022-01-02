@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    container_name: registry_postgres
+    container_name: wallet_postgres
     image: postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -24,7 +24,7 @@ services:
       - ALLOW_ANONYMOUS_LOGIN=yes
       
   kafka:
-    container_name: profile_kafka
+    container_name: wallet_kafka
     image: docker.io/bitnami/kafka:2
     ports:
       - "9092:9092"
@@ -43,14 +43,14 @@ services:
 
   kafka-ui:
     image: provectuslabs/kafka-ui
-    container_name: kafka-ui
+    container_name: wallet-kafka-ui
     ports:
       - "8080:8080"
     restart: always
     environment:
       - KAFKA_CLUSTERS_0_NAME=local
       - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
-      - KAFKA_CLUSTERS_0_ZOOKEEPER=localhost:2181
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
     depends_on:
       - kafka
 

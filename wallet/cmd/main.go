@@ -5,15 +5,15 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"registry_service/internal/app/api"
 	"syscall"
+	"wallet_service/internal/app/api"
 
-	reg "registry_service/internal/app/registry"
+	wal "wallet_service/internal/app/wallet"
 )
 
 func main() {
 	ctx := context.Background()
-	app := reg.NewRegistryApp(ctx)
+	app := wal.NewWalletApp(ctx)
 	s := api.NewServer(app)
 
 	defer s.Shutdown()

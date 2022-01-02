@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"time"
 	in "wallet_service/internal/app/interfaces"
 
@@ -124,6 +125,8 @@ func (c *KafkaClient) CloseWriter() error {
 }
 
 func (c *KafkaClient) ProduceHealthCheckMsg(ctx context.Context) error {
+	log.Println("Produce health check")
+
 	data := kafka.Message{
 		Value: []byte{1},
 	}
@@ -140,6 +143,7 @@ func (c *KafkaClient) ProduceHealthCheckMsg(ctx context.Context) error {
 		Dialer:       dialer,
 		RequiredAcks: -1,
 	})
+	defer writer.Close()
 
 	err := writer.WriteMessages(ctx, data)
 	if err != nil {
@@ -150,6 +154,8 @@ func (c *KafkaClient) ProduceHealthCheckMsg(ctx context.Context) error {
 }
 
 func (c *KafkaClient) ConsumeHealthCheckMsg(ctx context.Context) ([]byte, error) {
+	log.Println("Consume health check")
+
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  c.brokers,
 		Topic:    c.healthCheckTopic,
@@ -157,6 +163,7 @@ func (c *KafkaClient) ConsumeHealthCheckMsg(ctx context.Context) ([]byte, error)
 		MinBytes: 10e1,
 		MaxBytes: 10e6,
 	})
+	defer reader.Close()
 
 	data, err := reader.ReadMessage(context.Background())
 	if err != nil {
@@ -172,10 +179,14 @@ func (c *KafkaClient) ConsumeHealthCheckMsg(ctx context.Context) ([]byte, error)
 
 func (c *KafkaClient) HealthCheck(ctx context.Context) error {
 	if err := c.ProduceHealthCheckMsg(ctx); err != nil {
+		log.Println("Produce health check err", err)
+
 		return err
 	}
 
 	if _, err := c.ConsumeHealthCheckMsg(ctx); err != nil {
+		log.Println("Consume health check err", err)
+
 		return err
 	}
 

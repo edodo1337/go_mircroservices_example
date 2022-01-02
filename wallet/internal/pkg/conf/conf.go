@@ -69,17 +69,17 @@ func (c *Config) ServerAddr() string {
 	return fmt.Sprintf("%s:%s", c.Server.Host, c.Server.Port)
 }
 
-func (c *Config) RegistryDatabaseURI() string {
+func (c *Config) WalletDatabaseURI() string {
 	return fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s",
 		c.WalletDatabase.Username,
 		c.WalletDatabase.Password,
 		c.WalletDatabase.Host,
 		c.WalletDatabase.Port,
-		c.RegistryDatabaseDBName(),
+		c.WalletDatabaseDBName(),
 	)
 }
 
-func (c *Config) RegistryDatabaseDBName() string {
+func (c *Config) WalletDatabaseDBName() string {
 	return c.WalletDatabase.DBName
 }

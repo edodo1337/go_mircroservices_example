@@ -9,7 +9,7 @@ import (
 
 // Get orders list by user_id
 func (s *OrdersService) GetOrdersList(ctx context.Context, userID uint) ([]*models.Order, error) {
-	orders, err := s.ordersDAO.GetOrdersListByUserID(ctx, userID)
+	orders, err := s.ordersDAO.GetListByUserID(ctx, userID)
 
 	return orders, err
 }
@@ -26,7 +26,7 @@ func (s *OrdersService) MakeOrder(
 		productIDs = append(productIDs, item.ProductID)
 	}
 
-	productsPricesMap, err := s.productPricesDAO.GetProductPricesMap(ctx, productIDs)
+	productsPricesMap, err := s.productPricesDAO.GetMap(ctx, productIDs)
 	if err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ func (s *OrdersService) processNewOrder(
 ) error {
 	orderData := &in.CreateOrderDTO{UserID: newOrderData.UserID}
 
-	order, err := s.ordersDAO.CreateOrder(ctx, orderData)
+	order, err := s.ordersDAO.Create(ctx, orderData)
 	if err != nil {
 		return err
 	}
@@ -90,11 +90,11 @@ func (s *OrdersService) processNewOrder(
 		})
 	}
 
-	orderItems, err := s.orderItemsDAO.CreateOrderItemsBulk(ctx, order.ID, orderItemsData)
+	orderItems, err := s.orderItemsDAO.CreateBulk(ctx, order.ID, orderItemsData)
 	if err != nil {
 		// TODO dont delete but mark as rejected
 		// or implement transactions
-		s.ordersDAO.DeleteOrder(ctx, order.ID)
+		s.ordersDAO.Delete(ctx, order.ID)
 
 		return err
 	}
@@ -105,7 +105,7 @@ func (s *OrdersService) processNewOrder(
 	if err != nil {
 		// TODO dont delete but mark as rejected
 		// or implement transactions
-		s.ordersDAO.DeleteOrder(ctx, order.ID)
+		s.ordersDAO.Delete(ctx, order.ID)
 
 		return err
 	}
@@ -150,7 +150,7 @@ func (s *OrdersService) ConsumeRejectedOrderMsgLoop(ctx context.Context) {
 			if err == nil {
 				s.logger.Debug("Kafka rejected order msg:", msg)
 
-				_, updateErr := s.ordersDAO.UpdateOrderStatus(ctx, msg.OrderID, models.Rejected, msg.ReasonCode)
+				_, updateErr := s.ordersDAO.UpdateStatus(ctx, msg.OrderID, models.Rejected, msg.ReasonCode)
 				if updateErr != nil {
 					s.logger.Error("rejected order update err", updateErr)
 				}

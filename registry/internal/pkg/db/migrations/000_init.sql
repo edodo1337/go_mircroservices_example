@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS order_items (
   id SERIAL PRIMARY KEY,
   order_id bigint NOT NULL REFERENCES orders ON DELETE CASCADE,
-  product_id bigint NOT NULL REFERENCES products ON DELETE SET NULL,
+  product_id bigint REFERENCES products ON DELETE SET NULL,
   count smallint NOT NULL CHECK (count > 0),
   product_price decimal(3) NOT NULL
 );

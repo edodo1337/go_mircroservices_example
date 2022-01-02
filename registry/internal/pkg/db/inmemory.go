@@ -13,7 +13,7 @@ type InMemoryOrdersDAO struct {
 	lastOrderID   uint
 }
 
-func (dao *InMemoryOrdersDAO) CreateOrder(ctx context.Context, data *in.CreateOrderDTO) (*models.Order, error) {
+func (dao *InMemoryOrdersDAO) Create(ctx context.Context, data *in.CreateOrderDTO) (*models.Order, error) {
 	dao.lastOrderID++
 
 	order := &models.Order{
@@ -26,15 +26,15 @@ func (dao *InMemoryOrdersDAO) CreateOrder(ctx context.Context, data *in.CreateOr
 	return order, nil
 }
 
-func (dao *InMemoryOrdersDAO) GetOrdersListByUserID(ctx context.Context, userID uint) ([]*models.Order, error) {
+func (dao *InMemoryOrdersDAO) GetListByUserID(ctx context.Context, userID uint) ([]*models.Order, error) {
 	panic("not implemented")
 }
 
-func (dao *InMemoryOrdersDAO) GetOrderByID(ctx context.Context, orderID uint) (*models.Order, error) {
+func (dao *InMemoryOrdersDAO) GetByID(ctx context.Context, orderID uint) (*models.Order, error) {
 	panic("not implemented")
 }
 
-func (dao *InMemoryOrdersDAO) DeleteOrder(ctx context.Context, orderID uint) error {
+func (dao *InMemoryOrdersDAO) Delete(ctx context.Context, orderID uint) error {
 	_, ok := dao.OrdersKVStore[orderID]
 	if !ok {
 		return in.ErrOrderNotFound
@@ -45,11 +45,11 @@ func (dao *InMemoryOrdersDAO) DeleteOrder(ctx context.Context, orderID uint) err
 	return nil
 }
 
-func (dao *InMemoryOrdersDAO) UpdateOrderStatus(
+func (dao *InMemoryOrdersDAO) UpdateStatus(
 	ctx context.Context,
 	orderID uint,
 	status models.OrderStatus,
-	reasonCode uint8,
+	reasonCode models.CancelationReason,
 ) (*models.Order, error) {
 	order, exists := dao.OrdersKVStore[orderID]
 	if !exists {
@@ -80,7 +80,7 @@ type InMemoryOrderItemsDAO struct {
 	lastOrderItemID   uint
 }
 
-func (dao *InMemoryOrderItemsDAO) CreateOrderItemsBulk(
+func (dao *InMemoryOrderItemsDAO) CreateBulk(
 	ctx context.Context,
 	orderID uint,
 	items []*in.CreateOrderItemDTO,
@@ -110,7 +110,7 @@ func (dao *InMemoryOrderItemsDAO) CreateOrderItemsBulk(
 	return orderItems, nil
 }
 
-func (dao *InMemoryOrderItemsDAO) CreateOrderItem(
+func (dao *InMemoryOrderItemsDAO) Create(
 	ctx context.Context,
 	orderID uint,
 	data *in.CreateOrderItemDTO,
@@ -118,7 +118,7 @@ func (dao *InMemoryOrderItemsDAO) CreateOrderItem(
 	panic("not implemented")
 }
 
-func (dao *InMemoryOrderItemsDAO) GetOrderItemByID(ctx context.Context, orderItemID uint) (*models.OrderItem, error) {
+func (dao *InMemoryOrderItemsDAO) GetByID(ctx context.Context, orderItemID uint) (*models.OrderItem, error) {
 	panic("not implemented")
 }
 
@@ -139,7 +139,7 @@ type InMemoryProductPricesDAO struct {
 	ProductPricesKVStore map[uint]float32
 }
 
-func (dao *InMemoryProductPricesDAO) GetProductPricesMap(ctx context.Context, productIDs []uint) (in.ProductPricesMap, error) {
+func (dao *InMemoryProductPricesDAO) GetMap(ctx context.Context, productIDs []uint) (in.ProductPricesMap, error) {
 	if len(productIDs) == 0 {
 		return nil, in.ErrEmptyProductIDs
 	}

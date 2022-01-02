@@ -45,7 +45,8 @@ func (s *Server) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	go s.App.OrdersService.ConsumeRejectedOrderMsgLoop(ctx)
+	go s.App.PaymentService.ConsumeNewOrderMsgLoop(ctx)
+	go s.App.PaymentService.ConsumeRejectedOrderMsgLoop(ctx)
 
 	return nil
 }
@@ -57,8 +58,7 @@ func (s *Server) Shutdown() {
 func createRouter(s *Server) *mux.Router {
 	r := mux.NewRouter()
 	r.Handle("/health", s.HealthCheck()).Queries("timeout", "{[0-9]*?}").Methods(http.MethodGet)
-	r.Handle("/orders", s.CreateOrder()).Methods(http.MethodPost)
-	r.Handle("/orders", s.OrderList()).Queries("user_id", "{[0-9]*?}").Methods(http.MethodGet)
+	r.Handle("/health", s.HealthCheck()).Methods(http.MethodGet)
 
 	r.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
 		httpSwagger.URL(fmt.Sprintf("http://%s/swagger/doc.json", s.App.Config.ServerAddr())), // The url pointing to API definition

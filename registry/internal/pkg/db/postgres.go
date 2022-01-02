@@ -20,7 +20,7 @@ type PostgresOrdersDAO struct {
 	ordersTable string
 }
 
-func (dao *PostgresOrdersDAO) CreateOrder(ctx context.Context, data *in.CreateOrderDTO) (*models.Order, error) {
+func (dao *PostgresOrdersDAO) Create(ctx context.Context, data *in.CreateOrderDTO) (*models.Order, error) {
 	var order models.Order
 
 	err := dao.db.QueryRow(ctx, "create_order", data.UserID, models.Pending).Scan(
@@ -34,7 +34,7 @@ func (dao *PostgresOrdersDAO) CreateOrder(ctx context.Context, data *in.CreateOr
 	return &order, err
 }
 
-func (dao *PostgresOrdersDAO) GetOrdersListByUserID(ctx context.Context, userID uint) ([]*models.Order, error) {
+func (dao *PostgresOrdersDAO) GetListByUserID(ctx context.Context, userID uint) ([]*models.Order, error) {
 	rows, err := dao.db.Query(ctx, "orders_list_by_user_id", userID)
 	if err != nil {
 		return nil, err
@@ -62,21 +62,21 @@ func (dao *PostgresOrdersDAO) GetOrdersListByUserID(ctx context.Context, userID 
 	return orders, rows.Err()
 }
 
-func (dao *PostgresOrdersDAO) GetOrderByID(ctx context.Context, orderID uint) (*models.Order, error) {
+func (dao *PostgresOrdersDAO) GetByID(ctx context.Context, orderID uint) (*models.Order, error) {
 	panic("not implemented")
 }
 
-func (dao *PostgresOrdersDAO) DeleteOrder(ctx context.Context, orderID uint) error {
+func (dao *PostgresOrdersDAO) Delete(ctx context.Context, orderID uint) error {
 	_, err := dao.db.Exec(ctx, "delete_order", orderID)
 
 	return err
 }
 
-func (dao *PostgresOrdersDAO) UpdateOrderStatus(
+func (dao *PostgresOrdersDAO) UpdateStatus(
 	ctx context.Context,
 	orderID uint,
 	status models.OrderStatus,
-	reasonCode uint8,
+	reasonCode models.CancelationReason,
 ) (*models.Order, error) {
 	var order models.Order
 
@@ -151,7 +151,7 @@ type PostgresOrderItemsDAO struct {
 	orderItemsTable string
 }
 
-func (dao *PostgresOrderItemsDAO) CreateOrderItemsBulk(
+func (dao *PostgresOrderItemsDAO) CreateBulk(
 	ctx context.Context,
 	orderID uint,
 	items []*in.CreateOrderItemDTO,
@@ -204,7 +204,7 @@ func (dao *PostgresOrderItemsDAO) CreateOrderItemsBulk(
 	return orderItems, rows.Err()
 }
 
-func (dao *PostgresOrderItemsDAO) CreateOrderItem(
+func (dao *PostgresOrderItemsDAO) Create(
 	ctx context.Context,
 	orderID uint,
 	data *in.CreateOrderItemDTO,
@@ -212,7 +212,7 @@ func (dao *PostgresOrderItemsDAO) CreateOrderItem(
 	panic("not implemented")
 }
 
-func (dao *PostgresOrderItemsDAO) GetOrderItemByID(ctx context.Context, orderItemID uint) (*models.OrderItem, error) {
+func (dao *PostgresOrderItemsDAO) GetByID(ctx context.Context, orderItemID uint) (*models.OrderItem, error) {
 	panic("not implemented")
 }
 
@@ -245,20 +245,7 @@ func NewPostgresOrderItemsDAO(ctx context.Context, config *conf.Config) *Postgre
 		"delete_order": `DELETE FROM orders WHERE id=$1::bigint;`,
 	}
 
-	tx, err := dbConn.Begin(ctx)
-	if err != nil {
-		panic(err)
-	}
-
-	for k, v := range queriesMap {
-		if _, err := tx.Prepare(ctx, k, v); err != nil {
-			panic(err)
-		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		panic(err)
-	}
+	submitPreparedStatements(ctx, queriesMap, dbConn)
 
 	return &PostgresOrderItemsDAO{
 		db:              dbConn,
@@ -273,7 +260,7 @@ type PostgresProductPricesDAO struct {
 	productsTable string
 }
 
-func (dao *PostgresProductPricesDAO) GetProductPricesMap(ctx context.Context, productIDs []uint) (in.ProductPricesMap, error) {
+func (dao *PostgresProductPricesDAO) GetMap(ctx context.Context, productIDs []uint) (in.ProductPricesMap, error) {
 	if len(productIDs) == 0 {
 		return nil, in.ErrEmptyProductIDs
 	}
@@ -327,20 +314,7 @@ func NewPostgresProductPricesDAO(ctx context.Context, config *conf.Config) *Post
 		"products_list": `SELECT id, title, price FROM products;`,
 	}
 
-	tx, err := dbConn.Begin(ctx)
-	if err != nil {
-		panic(err)
-	}
-
-	for k, v := range queriesMap {
-		if _, err := tx.Prepare(ctx, k, v); err != nil {
-			panic(err)
-		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		panic(err)
-	}
+	submitPreparedStatements(ctx, queriesMap, dbConn)
 
 	return &PostgresProductPricesDAO{
 		db:            dbConn,

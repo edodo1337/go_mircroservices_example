@@ -1,0 +1,38 @@
+# Server configs
+server:
+  # host: "0.0.0.0"
+  host: "localhost"
+  port: 8002
+  prefix: "storage"
+  jwt_access_secret: "epstein didnt kill himself"
+  jwt_refresh_secret: "epstein didnt kill himself"
+  transactions_pipe_cap: 100
+
+# Database credentials
+storage_database:
+  host: "localhost"
+  user: "user"
+  password: "password"
+  db_name: "mydb"
+  storage_items_table: "storage_items"
+  transactions_table: "storage_transactions"
+
+
+# Kafka configs
+kafka:
+  new_orders_topic: "new_orders"
+  rejected_orders_topic: "rejected_orders"
+  group_id: "storage"
+  external_clients_port: 9092
+  internal_clients_port: 9093
+  brokers: ["localhost:9093"]
+  send_msg_timeout: 5
+  consume_loop_tick: 500
+  
+
+# Logger configs
+logger:
+  level: "INFO" 
+
+
+  

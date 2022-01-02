@@ -24,11 +24,11 @@ type CreateOrderResponse struct {
 }
 
 type OrdersListResponse struct {
-	ID             uint               `json:"id"`
-	UserID         uint               `json:"user_id"`
-	CreatedAt      time.Time          `json:"created_at"`
-	Status         models.OrderStatus `json:"status"`
-	RejectedReason uint8              `json:"rejected_reason"`
+	ID             uint                     `json:"id"`
+	UserID         uint                     `json:"user_id"`
+	CreatedAt      time.Time                `json:"created_at"`
+	Status         models.OrderStatus       `json:"status"`
+	RejectedReason models.CancelationReason `json:"rejected_reason"`
 }
 
 type HealthCheckResposne struct {

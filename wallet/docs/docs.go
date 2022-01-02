@@ -63,127 +63,9 @@ var doc = `{
                     }
                 }
             }
-        },
-        "/orders": {
-            "get": {
-                "description": "List user orders",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "orders"
-                ],
-                "summary": "List orders",
-                "parameters": [
-                    {
-                        "minimum": 1,
-                        "type": "integer",
-                        "name": "user_id",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.CreateOrderResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/api.ErrResponseMsg"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "Create order entrypoint",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "orders"
-                ],
-                "summary": "Create order entrypoint",
-                "parameters": [
-                    {
-                        "description": "order data",
-                        "name": "order",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.CreateOrderRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.CreateOrderResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/api.ErrResponseMsg"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
         }
     },
     "definitions": {
-        "api.CreateOrderRequest": {
-            "type": "object",
-            "properties": {
-                "order_items": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "$ref": "#/definitions/api.CreateOrderRequestItem"
-                    }
-                },
-                "user_id": {
-                    "type": "integer",
-                    "minimum": 1
-                }
-            }
-        },
-        "api.CreateOrderRequestItem": {
-            "type": "object",
-            "properties": {
-                "count": {
-                    "type": "integer",
-                    "minimum": 1
-                },
-                "product_id": {
-                    "type": "integer",
-                    "minimum": 1
-                }
-            }
-        },
-        "api.CreateOrderResponse": {
-            "type": "object",
-            "properties": {
-                "status": {
-                    "type": "string"
-                }
-            }
-        },
         "api.ErrResponseMsg": {
             "type": "object",
             "properties": {
@@ -198,13 +80,10 @@ var doc = `{
                 "broker_conn": {
                     "type": "string"
                 },
-                "order_items_conn": {
+                "wallet_trans_conn": {
                     "type": "string"
                 },
-                "orders_conn": {
-                    "type": "string"
-                },
-                "product_prices_conn": {
+                "wallets_conn": {
                     "type": "string"
                 }
             }
@@ -227,7 +106,7 @@ var SwaggerInfo = swaggerInfo{
 	Host:        "",
 	BasePath:    "",
 	Schemes:     []string{},
-	Title:       "Registry service",
+	Title:       "Wallet service",
 	Description: "Service responsible for register and manage order requests.",
 }
 

@@ -22,7 +22,7 @@ type App struct {
 	Config *conf.Config
 }
 
-func NewRegistryApp(ctx context.Context) *App {
+func NewWalletApp(ctx context.Context) *App {
 	config := conf.New()
 	logger := logrus.New()
 	// logger.SetFormatter(&logrus.JSONFormatter{})

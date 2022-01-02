@@ -69,6 +69,8 @@ func (s *PaymentService) ProcessTransactionsPipe(ctx context.Context) {
 			case models.Purchase:
 				err := s.processPurchase(ctx, trans)
 				if err != nil {
+					s.logger.Error("got process purchase error")
+
 					trans.Type = models.Cancelation
 					s.transactionsPipe <- trans
 				}
@@ -107,6 +109,10 @@ func (s *PaymentService) processPurchase(ctx context.Context, trans *in.Transact
 	})
 	if err != nil {
 		return err
+	}
+
+	if trans.Wallet.Balance < newTrans.Cost {
+		return in.ErrNotEnoughMoney
 	}
 
 	trans.Wallet.Balance -= newTrans.Cost
@@ -188,30 +194,21 @@ func (s *PaymentService) ConsumeRejectedOrderMsgLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			msg, err := s.brokerClient.GetNewOrderMsg(ctx)
+			msg, err := s.brokerClient.GetOrderRejectedMsg(ctx)
 			if err == nil {
-				s.logger.Debug("Kafka new order msg:", msg)
+				s.logger.Debug("Kafka rejected order msg:", msg)
 
-				orderItemsData := make([]*in.OrderItemDTO, 0, 10)
-				for _, v := range msg.OrderItems {
-					orderItemsData = append(orderItemsData, &in.OrderItemDTO{
-						ProductID:    v.ProductID,
-						Count:        v.Count,
-						ProductPrice: v.ProductPrice,
-					})
+				cancelOrderData := &in.CancelOrderDTO{
+					OrderID: msg.OrderID,
+					UserID:  msg.UserID,
+					Cost:    msg.Cost,
 				}
 
-				orderData := in.OrderDTO{
-					OrderID:    msg.OrderID,
-					UserID:     msg.UserID,
-					OrderItems: orderItemsData,
-				}
-
-				if purchaseErr := s.MakePurchase(ctx, &orderData); purchaseErr != nil {
-					s.logger.Error("new order make purchase err", purchaseErr)
+				if cancelErr := s.MakeCancelation(ctx, *cancelOrderData); cancelErr != nil {
+					s.logger.Error("rejected order update err", cancelErr)
 				}
 			} else {
-				s.logger.Error("got new order msg err", err)
+				s.logger.Error("get order rejected msg err", err)
 			}
 		case <-ctx.Done():
 			return

@@ -112,6 +112,7 @@ func (c *KafkaClient) ProduceHealthCheckMsg(ctx context.Context) error {
 		Dialer:       dialer,
 		RequiredAcks: -1,
 	})
+	defer writer.Close()
 
 	err := writer.WriteMessages(ctx, data)
 	if err != nil {
@@ -129,6 +130,7 @@ func (c *KafkaClient) ConsumeHealthCheckMsg(ctx context.Context) ([]byte, error)
 		MinBytes: 10e1,
 		MaxBytes: 10e6,
 	})
+	defer reader.Close()
 
 	data, err := reader.ReadMessage(context.Background())
 	if err != nil {
