@@ -20,4 +20,4 @@ CREATE TABLE IF NOT EXISTS order_items (
   product_price decimal(3) NOT NULL
 );
 
--- 
+INSERT INTO products(title, price) VALUES ('A', 1.0), ('B', 2.0), ('C', 3.0);

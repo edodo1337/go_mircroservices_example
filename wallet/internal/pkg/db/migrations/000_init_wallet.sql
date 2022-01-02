@@ -13,4 +13,4 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 
+INSERT INTO wallets(user_id, balance) VALUES(1, 100), (2, 100), (3, 100);

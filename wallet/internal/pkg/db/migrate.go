@@ -48,7 +48,7 @@ func getAppliedMigrations(ctx context.Context, conn *pgxpool.Pool) (map[string]s
 }
 
 func applyMigration(ctx context.Context, migrationName, query string, conn *pgxpool.Pool) error {
-	updateAppliedMigrationsQuery := fmt.Sprintf(`INSERT INTO migrations(name) VALUES (%s);`, migrationName)
+	updateAppliedMigrationsQuery := fmt.Sprintf(`INSERT INTO migrations(name) VALUES ('%s');`, migrationName)
 
 	finalQuery := query + updateAppliedMigrationsQuery
 
@@ -102,7 +102,7 @@ func Migrate(ctx context.Context, conn *pgxpool.Pool) error {
 
 			err = applyMigration(ctx, migratinoName, query, conn)
 			if err != nil {
-				return err
+				panic(err)
 			}
 		}
 	}

@@ -16,11 +16,10 @@ CREATE TABLE IF NOT EXISTS storage_transaction_items (
   id SERIAL PRIMARY KEY,
   order_id bigint NOT NULL CHECK (order_id > 0),
   product_id bigint NOT NULL CHECK (product_id > 0),
-  transaction_id bigint NOT NULL REFERENCES wallets ON DELETE CASCADE,
+  transaction_id bigint NOT NULL REFERENCES storage_transactions ON DELETE CASCADE,
   count int NOT NULL CHECK (count > 0)
 );
 
 
 INSERT INTO storage_items(product_id, count)
 VALUES (1, 10), (2, 10), (3, 10); 
--- 
