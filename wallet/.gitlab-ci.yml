@@ -1,0 +1,68 @@
+stages:
+  - lint
+  - test
+  - build
+  - image
+  - deploy
+
+lint:
+  image: registry.gitlab.com/gitlab-org/gitlab-build-images:golangci-lint-alpine
+  stage: test
+  script:
+    - golangci-lint run --issues-exit-code 0 --out-format code-climate | tee gl-code-quality-report.json | jq -r '.[] | "\(.location.path):\(.location.lines.begin) \(.description)"'
+    
+test:
+  image:
+    name: golang:1.17.1-stretch
+  stage: test
+  needs: [lint]
+  script:
+    - go test -v ./...
+
+build image:
+  image:
+    name: gcr.io/kaniko-project/executor:v1.6.0-debug
+    entrypoint: [""]
+  stage: build
+  needs: [test]
+  variables:
+    CONTEXT: $CI_PROJECT_DIR
+    DOCKERFILE: $CI_PROJECT_DIR/Dockerfile
+    PREFIX: ""
+  script:
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor --context $CONTEXT --dockerfile $DOCKERFILE --destination ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME} --cache=true --cache-ttl=120h
+
+.image_deploy:
+  image: 
+    name: lachlanevenson/k8s-kubectl:v1.22.0
+    entrypoint: [""]
+  stage: deploy
+  when: manual
+  needs:
+    - build image
+  script:
+    - export K8S_WORKLOAD_TYPE=deployment
+    - export K8S_WORKLOAD_NAME=$CI_PROJECT_NAME
+    - export K8S_CONTAINER_NAME=$CI_PROJECT_NAME
+    - export K8S_NS=$(echo $CI_PROJECT_PATH | awk -F\/ '{print $(NF-1)}')
+    - echo "Deploy $K8S_WORKLOAD_TYPE $K8S_WORKLOAD_NAME to namespace $K8S_NS"
+    - sed -i "s/<DEPLOYMENT_NAME>/$CI_PROJECT_NAME/g" deployment.yaml
+    - kubectl apply -f deployment.yaml --namespace=${K8S_NS}
+    # - kubectl create deployment $K8S_WORKLOAD_NAME --image=$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME -n ${K8S_NS} || echo deployment already exists
+    # - kubectl --record ${K8S_WORKLOAD_TYPE}.apps/${K8S_WORKLOAD_NAME} set image ${K8S_WORKLOAD_TYPE}.v1.apps/${K8S_WORKLOAD_NAME} ${K8S_CONTAINER_NAME}=$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME -n ${K8S_NS}
+    # - kubectl rollout restart ${K8S_WORKLOAD_TYPE} ${K8S_WORKLOAD_NAME} -n ${K8S_NS} 
+    # - kubectl rollout status ${K8S_WORKLOAD_TYPE} ${K8S_WORKLOAD_NAME} -n ${K8S_NS} --timeout=60s
+
+deploy staging:
+  extends: .image_deploy
+  when: always
+  only:
+    - main
+
+# deploy production:
+#   variables:
+#     K8S_NS: production-ns
+#   extends: .image_deploy
+#   only:
+#     - tags

@@ -1,0 +1,130 @@
+definitions:
+  api.CreateOrderRequest:
+    properties:
+      order_items:
+        items:
+          $ref: '#/definitions/api.CreateOrderRequestItem'
+        minItems: 1
+        type: array
+      user_id:
+        minimum: 1
+        type: integer
+    type: object
+  api.CreateOrderRequestItem:
+    properties:
+      count:
+        minimum: 1
+        type: integer
+      product_id:
+        minimum: 1
+        type: integer
+    type: object
+  api.CreateOrderResponse:
+    properties:
+      status:
+        type: string
+    type: object
+  api.ErrResponseMsg:
+    properties:
+      message:
+        type: string
+    type: object
+  api.HealthCheckResposne:
+    properties:
+      broker_conn:
+        type: string
+      order_items_conn:
+        type: string
+      orders_conn:
+        type: string
+      product_prices_conn:
+        type: string
+    type: object
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: Service responsible for register and manage order requests.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Registry service
+  version: "1.0"
+paths:
+  /health:
+    get:
+      description: Check DB and broker client connections
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HealthCheckResposne'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrResponseMsg'
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Healthcheck
+      tags:
+      - ops
+  /orders:
+    get:
+      description: List user orders
+      parameters:
+      - in: query
+        minimum: 1
+        name: user_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CreateOrderResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrResponseMsg'
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: List orders
+      tags:
+      - orders
+    post:
+      description: Create order entrypoint
+      parameters:
+      - description: order data
+        in: body
+        name: order
+        required: true
+        schema:
+          $ref: '#/definitions/api.CreateOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CreateOrderResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrResponseMsg'
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Create order entrypoint
+      tags:
+      - orders
+swagger: "2.0"

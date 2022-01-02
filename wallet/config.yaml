@@ -1,0 +1,35 @@
+# Server configs
+server:
+  # host: "0.0.0.0"
+  host: "localhost"
+  port: 8000
+  prefix: "registry"
+  wallets_table: "wallets"
+  transactions_table: "wallet_transactions"
+  jwt_access_secret: "epstein didnt kill himself"
+  jwt_refresh_secret: "epstein didnt kill himself"
+  transactions_pipe_cap: 100
+
+# Database credentials
+wallet_database:
+  user: "user"
+  password: "password"
+
+# Kafka configs
+kafka:
+  new_orders_topic: "new_orders"
+  rejected_orders_topic: "rejected_orders_topic"
+  group_id: "wallet"
+  external_clients_port: 9092
+  internal_clients_port: 9093
+  brokers: ["localhost:9093"]
+  send_msg_timeout: 5
+  consume_loop_tick: 500
+  
+
+# Logger configs
+logger:
+  level: "INFO" 
+
+
+  

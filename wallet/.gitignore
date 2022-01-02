@@ -1,0 +1,3 @@
+# Ignoring log files
+*.txt
+*.log
