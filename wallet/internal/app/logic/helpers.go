@@ -1,7 +1,9 @@
 package logic
 
 import (
+	"context"
 	in "wallet_service/internal/app/interfaces"
+	"wallet_service/internal/app/models"
 )
 
 func calcOrderSum(orderData *in.OrderDTO) float32 {
@@ -11,4 +13,23 @@ func calcOrderSum(orderData *in.OrderDTO) float32 {
 	}
 
 	return sum
+}
+
+func (s *PaymentService) sendSuccessMsg(ctx context.Context, data *in.Transaction) error {
+	err := s.brokerClient.SendPurchaseSuccess(ctx, &in.OrderSuccessMsg{
+		OrderID: data.OrderID,
+		Service: in.Storage,
+	})
+
+	return err
+}
+
+func (s *PaymentService) sendRejectedMsg(ctx context.Context, reasonCode models.CancelationReason, data *in.Transaction) error {
+	err := s.brokerClient.SendOrderRejectedMsg(ctx, &in.OrderRejectedMsg{
+		OrderID:    data.OrderID,
+		ReasonCode: reasonCode,
+		Service:    in.Storage,
+	})
+
+	return err
 }

@@ -86,7 +86,10 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.CreateOrderResponse"
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.OrdersListResponse"
+                            }
                         }
                     },
                     "400": {
@@ -128,6 +131,41 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/api.CreateOrderResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrResponseMsg"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/products": {
+            "get": {
+                "description": "List products",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "orders"
+                ],
+                "summary": "List products",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.ProductsListResponse"
+                            }
                         }
                     },
                     "400": {
@@ -205,6 +243,40 @@ var doc = `{
                     "type": "string"
                 },
                 "product_prices_conn": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.OrdersListResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "rejected_reason": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.ProductsListResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "title": {
                     "type": "string"
                 }
             }

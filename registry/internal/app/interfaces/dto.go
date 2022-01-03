@@ -38,6 +38,14 @@ type NewOrderDTO struct {
 }
 
 //--------------Broker Layer DTOs--------------
+type ServiceName uint8
+
+const (
+	Wallet ServiceName = iota
+	Storage
+	Registry
+)
+
 type NewOrderMsg struct {
 	UserID     uint              `json:"user_id"`
 	OrderID    uint              `json:"order_id"`
@@ -54,6 +62,11 @@ type NewOrderMsgItem struct {
 type OrderRejectedMsg struct {
 	OrderID    uint                     `json:"order_id"`
 	UserID     uint                     `json:"user_id"`
-	Cost       float32                  `json:"cost"`
+	Service    ServiceName              `json:"service"`
 	ReasonCode models.CancelationReason `json:"reason_code"`
+}
+
+type OrderSuccessMsg struct {
+	OrderID uint        `json:"order_id"`
+	Service ServiceName `json:"service"`
 }

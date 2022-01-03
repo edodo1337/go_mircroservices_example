@@ -158,6 +158,10 @@ func (dao *InMemoryProductPricesDAO) GetMap(ctx context.Context, productIDs []ui
 	return pricesMap, nil
 }
 
+func (dao *InMemoryProductPricesDAO) GetList(ctx context.Context) ([]*models.Product, error) {
+	panic("not implemented")
+}
+
 func (dao *InMemoryProductPricesDAO) HealthCheck(ctx context.Context) error {
 	return nil
 }

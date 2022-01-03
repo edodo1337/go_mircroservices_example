@@ -15,17 +15,19 @@ type KafkaClient struct {
 	NewOrdersReader      *kafka.Reader
 	RejectedOrdersReader *kafka.Reader
 
-	Writer *kafka.Writer
+	WriterFails   *kafka.Writer
+	WriterSuccess *kafka.Writer
 
 	brokers          []string
 	healthCheckTopic string
 }
 
-func NewKafkaClient(brokers []string, newOrdersTopic, rejectedOrdersTopic, groupID string) (*KafkaClient, error) {
+func NewKafkaClient(brokers []string, newOrdersTopic, rejectedOrdersTopic, successTopic, groupID string) (*KafkaClient, error) {
 	if len(brokers) == 0 ||
 		brokers[0] == "" ||
 		newOrdersTopic == "" ||
 		rejectedOrdersTopic == "" ||
+		successTopic == "" ||
 		groupID == "" {
 		return nil, in.ErrInvalidBrokerConnParams
 	}
@@ -56,9 +58,17 @@ func NewKafkaClient(brokers []string, newOrdersTopic, rejectedOrdersTopic, group
 		DualStack: true,
 	}
 
-	c.Writer = kafka.NewWriter(kafka.WriterConfig{
+	c.WriterFails = kafka.NewWriter(kafka.WriterConfig{
 		Brokers:      brokers,
 		Topic:        rejectedOrdersTopic,
+		Balancer:     &kafka.LeastBytes{},
+		Dialer:       dialer,
+		RequiredAcks: -1,
+	})
+
+	c.WriterSuccess = kafka.NewWriter(kafka.WriterConfig{
+		Brokers:      brokers,
+		Topic:        successTopic,
 		Balancer:     &kafka.LeastBytes{},
 		Dialer:       dialer,
 		RequiredAcks: -1,
@@ -67,7 +77,7 @@ func NewKafkaClient(brokers []string, newOrdersTopic, rejectedOrdersTopic, group
 	return &c, nil
 }
 
-func (c *KafkaClient) SendNewOrderMsg(ctx context.Context, msg *in.NewOrderMsg) error {
+func (c *KafkaClient) SendOrderRejectedMsg(ctx context.Context, msg *in.OrderRejectedMsg) error {
 	value, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -77,7 +87,22 @@ func (c *KafkaClient) SendNewOrderMsg(ctx context.Context, msg *in.NewOrderMsg) 
 		Value: value,
 	}
 
-	err = c.Writer.WriteMessages(ctx, data)
+	err = c.WriterFails.WriteMessages(ctx, data)
+
+	return err
+}
+
+func (c *KafkaClient) SendReservationSuccess(ctx context.Context, msg *in.OrderSuccessMsg) error {
+	value, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	data := kafka.Message{
+		Value: value,
+	}
+
+	err = c.WriterSuccess.WriteMessages(ctx, data)
 
 	return err
 }
@@ -119,9 +144,14 @@ func (c *KafkaClient) CloseReader() error {
 }
 
 func (c *KafkaClient) CloseWriter() error {
-	err := c.Writer.Close()
+	if err := c.WriterFails.Close(); err != nil {
+		return err
+	}
+	if err := c.WriterSuccess.Close(); err != nil {
+		return err
+	}
 
-	return err
+	return nil
 }
 
 func (c *KafkaClient) ProduceHealthCheckMsg(ctx context.Context) error {

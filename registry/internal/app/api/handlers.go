@@ -129,6 +129,36 @@ func (s *Server) OrderList() http.Handler {
 	return http.HandlerFunc(handler)
 }
 
+// @Summary List products
+// @Description List products
+// @Produce json
+// @Tags	orders
+// @Success 200 {array} ProductsListResponse
+// @Failure 400 {object} ErrResponseMsg
+// @Failure 500 {string} error
+// @Router /products [GET]
+func (s *Server) ProductsList() http.Handler {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		products, err := s.App.OrdersService.GetProductList(r.Context())
+		if err != nil {
+			JSONResponse(w, err.Error(), http.StatusBadRequest)
+		}
+
+		productsReponse := make([]ProductsListResponse, 0, 10)
+		for _, v := range products {
+			productsReponse = append(productsReponse, ProductsListResponse{
+				ID:    v.ID,
+				Title: v.Title,
+				Price: v.Price,
+			})
+		}
+
+		JSONResponse(w, productsReponse, http.StatusOK)
+	}
+
+	return http.HandlerFunc(handler)
+}
+
 // @Summary Healthcheck
 // @Description Check DB and broker client connections
 // @Produce json

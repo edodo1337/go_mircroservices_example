@@ -31,6 +31,7 @@ type Config struct {
 	Kafka struct {
 		NewOrdersTopic      string   `yaml:"new_orders_topic"`
 		RejectedOrdersTopic string   `yaml:"rejected_orders_topic"`
+		SuccessTopic        string   `yaml:"success_topic"`
 		GroupID             string   `yaml:"group_id"`
 		Brokers             []string `yaml:"brokers"`
 		ExternalClientsPort uint16   `yaml:"external_clients_port"`

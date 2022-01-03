@@ -102,6 +102,7 @@ func TestMakeOrderWithKafka(t *testing.T) {
 		config.Kafka.Brokers,
 		config.Kafka.NewOrdersTopic,
 		config.Kafka.RejectedOrdersTopic,
+		config.Kafka.SuccessTopic,
 		config.Kafka.GroupID,
 	)
 	if err != nil {
@@ -175,6 +176,7 @@ func TestMakeOrderWithKafkaAndConsumeRejected(t *testing.T) {
 		config.Kafka.Brokers,
 		config.Kafka.NewOrdersTopic,
 		config.Kafka.RejectedOrdersTopic,
+		config.Kafka.SuccessTopic,
 		config.Kafka.GroupID,
 	)
 	if err != nil {

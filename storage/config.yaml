@@ -1,16 +1,18 @@
 # Server configs
 server:
-  # host: "0.0.0.0"
-  host: "localhost"
+  host: "0.0.0.0"
+  # host: "localhost"
   port: 8002
   prefix: "storage"
-  jwt_access_secret: "epstein didnt kill himself"
-  jwt_refresh_secret: "epstein didnt kill himself"
+  jwt_access_secret: "santa claus is real"
+  jwt_refresh_secret: "grays from zeta reticuli"
   transactions_pipe_cap: 100
 
 # Database credentials
 storage_database:
-  host: "localhost"
+  # host: "localhost"
+  host: "services_postgres"
+  port: 5432
   user: "user"
   password: "password"
   db_name: "mydb"
@@ -22,17 +24,19 @@ storage_database:
 kafka:
   new_orders_topic: "new_orders"
   rejected_orders_topic: "rejected_orders"
+  success_topic: "success_topic"
   group_id: "storage"
   external_clients_port: 9092
   internal_clients_port: 9093
-  brokers: ["localhost:9093"]
+  brokers: ["services_kafka:9093"]
+  # brokers: ["localhost:9093"]
   send_msg_timeout: 5
   consume_loop_tick: 500
   
 
 # Logger configs
 logger:
-  level: "INFO" 
+  log_level: "INFO" 
 
 
   

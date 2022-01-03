@@ -1,6 +1,10 @@
 package models
 
-type OrderStatus uint8
+type (
+	OrderStatus       uint8
+	TransactionType   uint8
+	CancelationReason uint8
+)
 
 const (
 	Pending OrderStatus = iota
@@ -9,11 +13,16 @@ const (
 	Rejected
 )
 
-type TransactionType uint8
-
 const (
 	Reservation TransactionType = iota
 	Cancelation
+)
+
+const (
+	OK CancelationReason = iota
+	NotEnoughMoney
+	OutOfStock
+	InternalError
 )
 
 type StorageItem struct {

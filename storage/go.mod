@@ -5,13 +5,13 @@ go 1.17
 require (
 	github.com/creasty/defaults v1.5.2
 	github.com/gorilla/mux v1.8.0
+	github.com/jackc/pgx v3.6.2+incompatible
 	github.com/jackc/pgx/v4 v4.14.1
 	github.com/lib/pq v1.10.4
 	github.com/segmentio/kafka-go v0.4.25
 	github.com/sirupsen/logrus v1.8.1
 	github.com/swaggo/http-swagger v1.1.2
 	github.com/swaggo/swag v1.7.8
-	gopkg.in/validator.v2 v2.0.0-20210331031555-b37d688a7fb0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -25,6 +25,7 @@ require (
 	github.com/go-openapi/swag v0.19.15 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
+	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
 	github.com/jackc/pgconn v1.10.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -36,6 +37,7 @@ require (
 	github.com/klauspost/compress v1.9.8 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
+	github.com/pkg/errors v0.8.1 // indirect
 	github.com/swaggo/files v0.0.0-20190704085106-630677cd5c14 // indirect
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97 // indirect
 	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d // indirect

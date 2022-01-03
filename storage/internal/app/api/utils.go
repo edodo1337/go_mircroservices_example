@@ -38,15 +38,16 @@ func NewServer(app *storage.App) *Server {
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	if err := s.Serv.ListenAndServe(); err != nil {
-		return err
-	}
-
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	go s.App.StorageService.ConsumeNewOrderMsgLoop(ctx)
 	go s.App.StorageService.ConsumeRejectedOrderMsgLoop(ctx)
+	go s.App.StorageService.ProcessTransactionsPipe(ctx)
+
+	if err := s.Serv.ListenAndServe(); err != nil {
+		return err
+	}
 
 	return nil
 }

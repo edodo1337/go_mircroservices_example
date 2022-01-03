@@ -7,6 +7,7 @@ import (
 type BrokerClient interface {
 	SendNewOrderMsg(ctx context.Context, msg *NewOrderMsg) error
 	GetOrderRejectedMsg(ctx context.Context) (*OrderRejectedMsg, error)
+	GetSuccessMsg(ctx context.Context) (*OrderSuccessMsg, error)
 
 	CloseReader() error
 	CloseWriter() error

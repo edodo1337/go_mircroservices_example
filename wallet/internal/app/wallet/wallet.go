@@ -35,6 +35,7 @@ func NewWalletApp(ctx context.Context) *App {
 		config.Kafka.Brokers,
 		config.Kafka.NewOrdersTopic,
 		config.Kafka.RejectedOrdersTopic,
+		config.Kafka.SuccessTopic,
 		config.Kafka.GroupID,
 	)
 	if err != nil {

@@ -11,18 +11,21 @@ import (
 )
 
 type KafkaClient struct {
-	Reader *kafka.Reader
+	ReaderSuccess *kafka.Reader
+	ReaderFail    *kafka.Reader
+
 	Writer *kafka.Writer
 
 	brokers          []string
 	healthCheckTopic string
 }
 
-func NewKafkaClient(brokers []string, newOrdersTopic, rejectedOrdersTopic, groupID string) (*KafkaClient, error) {
+func NewKafkaClient(brokers []string, newOrdersTopic, rejectedOrdersTopic, successTopic, groupID string) (*KafkaClient, error) {
 	if len(brokers) == 0 ||
 		brokers[0] == "" ||
 		newOrdersTopic == "" ||
 		rejectedOrdersTopic == "" ||
+		successTopic == "" ||
 		groupID == "" {
 		return nil, in.ErrInvalidBrokerConnParams
 	}
@@ -32,9 +35,17 @@ func NewKafkaClient(brokers []string, newOrdersTopic, rejectedOrdersTopic, group
 		healthCheckTopic: "healthcheck",
 	}
 
-	c.Reader = kafka.NewReader(kafka.ReaderConfig{
+	c.ReaderFail = kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  brokers,
 		Topic:    rejectedOrdersTopic,
+		GroupID:  groupID,
+		MinBytes: 10e1,
+		MaxBytes: 10e6,
+	})
+
+	c.ReaderSuccess = kafka.NewReader(kafka.ReaderConfig{
+		Brokers:  brokers,
+		Topic:    successTopic,
 		GroupID:  groupID,
 		MinBytes: 10e1,
 		MaxBytes: 10e6,
@@ -72,7 +83,7 @@ func (c *KafkaClient) SendNewOrderMsg(ctx context.Context, msg *in.NewOrderMsg) 
 }
 
 func (c *KafkaClient) GetOrderRejectedMsg(ctx context.Context) (*in.OrderRejectedMsg, error) {
-	data, err := c.Reader.ReadMessage(context.Background())
+	data, err := c.ReaderFail.ReadMessage(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -83,10 +94,27 @@ func (c *KafkaClient) GetOrderRejectedMsg(ctx context.Context) (*in.OrderRejecte
 	return &msg, err
 }
 
-func (c *KafkaClient) CloseReader() error {
-	err := c.Reader.Close()
+func (c *KafkaClient) GetSuccessMsg(ctx context.Context) (*in.OrderSuccessMsg, error) {
+	data, err := c.ReaderSuccess.ReadMessage(context.Background())
+	if err != nil {
+		return nil, err
+	}
 
-	return err
+	var msg in.OrderSuccessMsg
+	err = json.Unmarshal(data.Value, &msg)
+
+	return &msg, err
+}
+
+func (c *KafkaClient) CloseReader() error {
+	if err := c.ReaderFail.Close(); err != nil {
+		return err
+	}
+	if err := c.ReaderSuccess.Close(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *KafkaClient) CloseWriter() error {

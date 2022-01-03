@@ -10,6 +10,8 @@ type (
 
 const (
 	Pending OrderStatus = iota
+	Paid
+	Reserved
 	Canceled
 	Completed
 	Rejected
@@ -21,7 +23,8 @@ const (
 )
 
 const (
-	NotEnoughMoney CancelationReason = iota
+	OK CancelationReason = iota
+	NotEnoughMoney
 	OutOfStock
 	InternalError
 )

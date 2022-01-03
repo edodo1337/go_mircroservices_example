@@ -2,10 +2,12 @@ package db
 
 import (
 	"context"
+	"errors"
 	in "wallet_service/internal/app/interfaces"
 	"wallet_service/internal/app/models"
 	"wallet_service/internal/pkg/conf"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
@@ -65,7 +67,8 @@ func NewPostgresWalletsDAO(ctx context.Context, config *conf.Config) *PostgresWa
 		"get_wallet_by_user_id": `SELECT id, user_id, balance 
 			FROM wallets WHERE user_id=$1::bigint;`,
 		"update_wallet": `UPDATE wallets SET balance=$1::decimal
-			WHERE id=$2::bigint;`,
+			WHERE id=$2::bigint
+			RETURNING id, user_id, balance;`,
 	}
 
 	submitPreparedStatements(ctx, queriesMap, dbConn)
@@ -94,6 +97,10 @@ func (dao *PostgresTransactionsDAO) GetByOrderID(ctx context.Context, orderID ui
 		&trans.Type,
 	)
 
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, in.ErrTransNotFound
+	}
+
 	return &trans, err
 }
 
@@ -110,11 +117,11 @@ func (dao *PostgresTransactionsDAO) Create(
 		data.Cost,
 		data.Type,
 	).Scan(
-		trans.ID,
-		trans.WalletID,
-		trans.OrderID,
-		trans.Cost,
-		trans.Type,
+		&trans.ID,
+		&trans.WalletID,
+		&trans.OrderID,
+		&trans.Cost,
+		&trans.Type,
 	)
 
 	return &trans, err
@@ -144,7 +151,8 @@ func NewPostgresWalletTransDAO(ctx context.Context, config *conf.Config) *Postgr
 		"get_transaction_by_order_id": `SELECT id, wallet_id, order_id, cost, type 
 			FROM wallet_transactions WHERE order_id=$1::bigint;`,
 		"create_transaction": `INSERT INTO wallet_transactions(wallet_id, order_id, cost, type) 
-			VALUES ($1::bigint, $2::bigint, $3::decimal, $4::smallint);`,
+			VALUES ($1::bigint, $2::bigint, $3::decimal, $4::smallint)
+			RETURNING id, wallet_id, order_id, cost, type;`,
 	}
 
 	submitPreparedStatements(ctx, queriesMap, dbConn)

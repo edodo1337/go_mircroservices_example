@@ -55,6 +55,10 @@ func (c *InMemoryBrokerClient) CloseWriter() error {
 	return nil
 }
 
+func (c *InMemoryBrokerClient) GetSuccessMsg(ctx context.Context) (*in.OrderSuccessMsg, error) {
+	panic("not impl")
+}
+
 func (c *InMemoryBrokerClient) ProduceHealthCheckMsg(ctx context.Context) error {
 	return nil
 }

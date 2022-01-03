@@ -19,7 +19,8 @@ const (
 )
 
 const (
-	NotEnoughMoney CancelationReason = iota
+	OK CancelationReason = iota
+	NotEnoughMoney
 	OutOfStock
 	InternalError
 )

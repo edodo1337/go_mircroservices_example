@@ -290,6 +290,32 @@ func (dao *PostgresProductPricesDAO) GetMap(ctx context.Context, productIDs []ui
 	return pricesMap, rows.Err()
 }
 
+func (dao *PostgresProductPricesDAO) GetList(ctx context.Context) ([]*models.Product, error) {
+	rows, err := dao.db.Query(ctx, "products_list")
+	if err != nil {
+		return nil, err
+	}
+
+	products := make([]*models.Product, 0, 10)
+
+	for rows.Next() {
+		var product models.Product
+
+		err = rows.Scan(
+			&product.ID,
+			&product.Title,
+			&product.Price,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		products = append(products, &product)
+	}
+
+	return products, nil
+}
+
 func (dao *PostgresProductPricesDAO) HealthCheck(ctx context.Context) error {
 	if err := dao.db.Ping(ctx); err != nil {
 		return err

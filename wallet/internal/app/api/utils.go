@@ -38,15 +38,16 @@ func NewServer(app *wallet.App) *Server {
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	if err := s.Serv.ListenAndServe(); err != nil {
-		return err
-	}
-
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	go s.App.PaymentService.ConsumeNewOrderMsgLoop(ctx)
 	go s.App.PaymentService.ConsumeRejectedOrderMsgLoop(ctx)
+	go s.App.PaymentService.ProcessTransactionsPipe(ctx)
+
+	if err := s.Serv.ListenAndServe(); err != nil {
+		return err
+	}
 
 	return nil
 }

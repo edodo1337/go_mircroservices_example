@@ -9,4 +9,5 @@ var (
 	ErrBrokerConnClosed           = errors.New("broker connection closed")
 	ErrProductNotFoundByID        = errors.New("product not found by id")
 	ErrOutOfStock                 = errors.New("product out of stock")
+	ErrTransNotFound              = errors.New("transaction not found")
 )

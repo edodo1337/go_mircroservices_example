@@ -31,6 +31,12 @@ type OrdersListResponse struct {
 	RejectedReason models.CancelationReason `json:"rejected_reason"`
 }
 
+type ProductsListResponse struct {
+	ID    uint    `json:"id"`
+	Title string  `json:"title"`
+	Price float32 `json:"price"`
+}
+
 type HealthCheckResposne struct {
 	OrdersConn        string `json:"orders_conn"`
 	OrderItemsConn    string `json:"order_items_conn"`

@@ -61,6 +61,7 @@ func createRouter(s *Server) *mux.Router {
 	r.Handle("/health", s.HealthCheck()).Methods(http.MethodGet)
 	r.Handle("/orders", s.CreateOrder()).Methods(http.MethodPost)
 	r.Handle("/orders", s.OrderList()).Queries("user_id", "{[0-9]*?}").Methods(http.MethodGet)
+	r.Handle("/products", s.ProductsList()).Methods(http.MethodGet)
 
 	r.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
 		httpSwagger.URL(fmt.Sprintf("http://%s/swagger/doc.json", s.App.Config.ServerAddr())), // The url pointing to API definition

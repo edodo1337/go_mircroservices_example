@@ -32,18 +32,18 @@ func NewRegistryApp(ctx context.Context) *App {
 		parseLogLevel(config.Logger.LogLevel),
 	)
 
-	// brokerClient, err := broker.NewKafkaClient(
-	// 	config.Kafka.Brokers,
-	// 	config.Kafka.NewOrdersTopic,
-	// 	config.Kafka.RejectedOrdersTopic,
-	// 	config.Kafka.GroupID,
-	// )
-	// if err != nil {
-	// 	panic(err)
-	// }
+	brokerClient, err := broker.NewKafkaClient(
+		config.Kafka.Brokers,
+		config.Kafka.NewOrdersTopic,
+		config.Kafka.RejectedOrdersTopic,
+		config.Kafka.SuccessTopic,
+		config.Kafka.GroupID,
+	)
+	if err != nil {
+		panic(err)
+	}
 
-	brokerClient := broker.NewInMemoryBrokerClient()
-
+	// brokerClient := broker.NewInMemoryBrokerClient()
 	// ordersDAO := db.NewInMemoryOrdersDAO()
 	// orderItemsDAO := db.NewInMemoryOrderItemsDAO()
 	// productPricesDAO := db.NewInMemoryProductPricesDAO()

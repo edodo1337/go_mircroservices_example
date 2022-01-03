@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"errors"
 	"time"
 	in "wallet_service/internal/app/interfaces"
 	"wallet_service/internal/app/models"
@@ -12,6 +13,8 @@ func (s *PaymentService) MakePurchase(
 	ctx context.Context,
 	orderData *in.OrderDTO,
 ) error {
+	s.logger.Info("Making purchase")
+
 	wallet, err := s.walletsDAO.GetByUserID(ctx, orderData.UserID)
 	if err != nil {
 		return err
@@ -32,6 +35,8 @@ func (s *PaymentService) MakePurchase(
 		return in.ErrNewTransactionTimeoutError
 	}
 
+	s.logger.Info("Purchase success")
+
 	return nil
 }
 
@@ -40,13 +45,24 @@ func (s *PaymentService) MakeCancelation(
 	ctx context.Context,
 	orderData in.CancelOrderDTO,
 ) error {
+	s.logger.Info("Making cancelation", orderData)
+
 	wallet, err := s.walletsDAO.GetByUserID(ctx, orderData.UserID)
 	if err != nil {
+		s.logger.Error("Cancelation wallet get by user id err: ", err)
+
+		return err
+	}
+
+	oldTrans, err := s.walletsTransactionsDAO.GetByOrderID(ctx, orderData.OrderID)
+	if err != nil {
+		s.logger.Error("Cancelation wallet old trans not found err: ", err)
+
 		return err
 	}
 
 	trans := &in.Transaction{
-		Cost:    orderData.Cost,
+		Cost:    oldTrans.Cost,
 		OrderID: orderData.OrderID,
 		Wallet:  wallet,
 		Type:    models.Cancelation,
@@ -58,6 +74,8 @@ func (s *PaymentService) MakeCancelation(
 		return in.ErrNewTransactionTimeoutError
 	}
 
+	s.logger.Info("Cancelation success")
+
 	return nil
 }
 
@@ -67,17 +85,27 @@ func (s *PaymentService) ProcessTransactionsPipe(ctx context.Context) {
 		case trans := <-s.transactionsPipe:
 			switch trans.Type {
 			case models.Purchase:
-				err := s.processPurchase(ctx, trans)
+				code, err := s.processPurchase(ctx, trans)
 				if err != nil {
-					s.logger.Error("got process purchase error")
+					s.logger.Error("got process purchase error: ", err, code)
 
 					trans.Type = models.Cancelation
 					s.transactionsPipe <- trans
+
+					errSend := s.sendRejectedMsg(ctx, code, trans)
+					if errSend != nil {
+						s.logger.Error("send rejected msg error: ", errSend)
+					}
+				}
+
+				errSend := s.sendSuccessMsg(ctx, trans)
+				if errSend != nil {
+					s.logger.Error("send success msg error: ", errSend)
 				}
 			case models.Cancelation:
 				err := s.processCancelation(ctx, trans)
 				if err != nil {
-					s.logger.Error("got process cancellation error")
+					s.logger.Error("got process cancellation error: ", err)
 				}
 			default:
 				s.logger.Error("Invalid transaction type")
@@ -91,14 +119,18 @@ func (s *PaymentService) ProcessTransactionsPipe(ctx context.Context) {
 	}
 }
 
-func (s *PaymentService) processPurchase(ctx context.Context, trans *in.Transaction) error {
+func (s *PaymentService) processPurchase(ctx context.Context, trans *in.Transaction) (models.CancelationReason, error) {
+	s.logger.Info("Processing purchase")
+
 	existingTrans, err := s.walletsTransactionsDAO.GetByOrderID(ctx, trans.OrderID)
-	if err != nil {
-		return err
+	if err != nil && !errors.Is(err, in.ErrTransNotFound) {
+		s.logger.Error("got process purchase err: ", err)
+
+		return models.InternalError, err
 	}
 
 	if existingTrans != nil {
-		return nil
+		return models.OK, nil
 	}
 
 	newTrans, err := s.walletsTransactionsDAO.Create(ctx, &in.CreateWalletTransactionDTO{
@@ -108,24 +140,28 @@ func (s *PaymentService) processPurchase(ctx context.Context, trans *in.Transact
 		Type:     trans.Type,
 	})
 	if err != nil {
-		return err
+		return models.InternalError, err
 	}
 
 	if trans.Wallet.Balance < newTrans.Cost {
-		return in.ErrNotEnoughMoney
+		return models.NotEnoughMoney, in.ErrNotEnoughMoney
 	}
 
 	trans.Wallet.Balance -= newTrans.Cost
 	if _, err := s.walletsDAO.UpdateBalance(ctx, trans.Wallet); err != nil {
-		return err
+		return models.InternalError, err
 	}
 
-	return nil
+	s.logger.Info("Processing purchase success")
+
+	return models.OK, nil
 }
 
 func (s *PaymentService) processCancelation(ctx context.Context, trans *in.Transaction) error {
+	s.logger.Info("Processing cancelation")
+
 	existingTrans, err := s.walletsTransactionsDAO.GetByOrderID(ctx, trans.OrderID)
-	if err != nil {
+	if err != nil && !errors.Is(err, in.ErrTransNotFound) {
 		return err
 	}
 
@@ -147,6 +183,8 @@ func (s *PaymentService) processCancelation(ctx context.Context, trans *in.Trans
 	if _, err := s.walletsDAO.UpdateBalance(ctx, trans.Wallet); err != nil {
 		return err
 	}
+
+	s.logger.Info("Processing cancelation success")
 
 	return nil
 }
@@ -195,20 +233,26 @@ func (s *PaymentService) ConsumeRejectedOrderMsgLoop(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			msg, err := s.brokerClient.GetOrderRejectedMsg(ctx)
+
+			if msg.Service == in.Wallet {
+				s.logger.Info("Got message for wallet. Skip")
+
+				continue
+			}
+
 			if err == nil {
 				s.logger.Debug("Kafka rejected order msg:", msg)
 
 				cancelOrderData := &in.CancelOrderDTO{
 					OrderID: msg.OrderID,
 					UserID:  msg.UserID,
-					Cost:    msg.Cost,
 				}
 
 				if cancelErr := s.MakeCancelation(ctx, *cancelOrderData); cancelErr != nil {
-					s.logger.Error("rejected order update err", cancelErr)
+					s.logger.Error("rejected order update err: ", cancelErr)
 				}
 			} else {
-				s.logger.Error("get order rejected msg err", err)
+				s.logger.Error("get order rejected msg err: ", err)
 			}
 		case <-ctx.Done():
 			return

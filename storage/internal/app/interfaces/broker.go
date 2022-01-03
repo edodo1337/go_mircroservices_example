@@ -5,9 +5,11 @@ import (
 )
 
 type BrokerClient interface {
-	SendNewOrderMsg(ctx context.Context, msg *NewOrderMsg) error
 	GetOrderRejectedMsg(ctx context.Context) (*OrderRejectedMsg, error)
 	GetNewOrderMsg(ctx context.Context) (*NewOrderMsg, error)
+
+	SendOrderRejectedMsg(ctx context.Context, msg *OrderRejectedMsg) error
+	SendReservationSuccess(ctx context.Context, msg *OrderSuccessMsg) error
 
 	CloseReader() error
 	CloseWriter() error

@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"context"
 	in "storage_service/internal/app/interfaces"
 	"storage_service/internal/app/models"
 )
@@ -24,12 +25,34 @@ func makeStorageItemsMap(items []*models.StorageItem) map[uint]*models.StorageIt
 	return m
 }
 
-func makeTransItemsMap(items []*models.StorageTransactionItem) map[uint]*models.StorageTransactionItem {
-	m := make(map[uint]*models.StorageTransactionItem)
+func makeTransItemsMap(items []*in.CreateStorageTransactionItemDTO) map[uint]*in.CreateStorageTransactionItemDTO {
+	m := make(map[uint]*in.CreateStorageTransactionItemDTO)
 
 	for _, v := range items {
 		m[v.ProductID] = v
 	}
 
 	return m
+}
+
+func (s *StorageService) sendSuccessMsg(ctx context.Context, data *in.Transaction) error {
+	err := s.brokerClient.SendReservationSuccess(ctx, &in.OrderSuccessMsg{
+		OrderID: data.OrderID,
+		Service: in.Storage,
+	})
+
+	return err
+}
+
+func (s *StorageService) sendRejectedMsg(ctx context.Context, reasonCode models.CancelationReason, data *in.Transaction) error {
+	s.logger.Info("Kafka Send rejected message: ", data, reasonCode)
+
+	err := s.brokerClient.SendOrderRejectedMsg(ctx, &in.OrderRejectedMsg{
+		OrderID:    data.OrderID,
+		UserID:     data.UserID,
+		ReasonCode: reasonCode,
+		Service:    in.Storage,
+	})
+
+	return err
 }

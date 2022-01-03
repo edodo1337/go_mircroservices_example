@@ -2,12 +2,14 @@ package db
 
 import (
 	"context"
+	"errors"
 	in "storage_service/internal/app/interfaces"
 	"storage_service/internal/app/models"
 	"storage_service/internal/pkg/conf"
 
 	"github.com/lib/pq"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
@@ -79,12 +81,14 @@ func (dao *PostgresStorageItemsDAO) UpdateCountBulk(ctx context.Context, items [
 	}
 
 	for _, v := range items {
-		if _, err := tx.Query(ctx, "update_storage_item_count", v.Count, v.ProductID); err != nil {
+		if _, err := tx.Exec(ctx, "update_storage_item_count", v.Count, v.ProductID); err != nil {
 			return err
 		}
 	}
 
-	tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -141,8 +145,8 @@ func (dao *PostgresTransactionsDAO) GetByOrderID(ctx context.Context, orderID ui
 		&trans.OrderID,
 		&trans.Type,
 	)
-	if err != nil {
-		return nil, err
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, in.ErrTransNotFound
 	}
 
 	rows, err := dao.db.Query(ctx, "transaction_items_by_trans_id", trans.ID)
@@ -168,13 +172,15 @@ func (dao *PostgresTransactionsDAO) GetByOrderID(ctx context.Context, orderID ui
 		items = append(items, &item)
 	}
 
+	trans.Items = items
+
 	return &trans, rows.Err()
 }
 
 func (dao *PostgresTransactionsDAO) GetItemsByOrderID(ctx context.Context, orderID uint) ([]*models.StorageTransactionItem, error) {
 	rows, err := dao.db.Query(ctx, "transaction_by_order_id", orderID)
-	if err != nil {
-		return nil, err
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, in.ErrTransNotFound
 	}
 
 	items := make([]*models.StorageTransactionItem, 0, 10)
@@ -203,23 +209,28 @@ func (dao *PostgresTransactionsDAO) Create(
 	data *in.CreateStorageTransactionDTO,
 ) (*models.StorageTransaction, error) {
 	tx, err := dao.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	var trans models.StorageTransaction
-	err = dao.db.QueryRow(
+
+	err = tx.QueryRow(
 		ctx,
 		"create_transaction",
 		data.OrderID,
 		data.Type,
 	).Scan(
-		trans.ID,
-		trans.OrderID,
-		trans.Type,
+		&trans.ID,
+		&trans.OrderID,
+		&trans.Type,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	items := make([]*models.StorageTransactionItem, 0, 10)
+
 	for _, v := range data.Items {
 		var item models.StorageTransactionItem
 
@@ -240,10 +251,13 @@ func (dao *PostgresTransactionsDAO) Create(
 			return nil, err
 		}
 
-		items = append(items)
+		items = append(items, &item)
 	}
 
-	tx.Commit(ctx)
+	errTx := tx.Commit(ctx)
+	if errTx != nil {
+		return nil, errTx
+	}
 
 	trans.Items = items
 
@@ -279,12 +293,11 @@ func NewPostgresStorageTransDAO(ctx context.Context, config *conf.Config) *Postg
 			WHERE transaction_id=$1::bigint;`,
 		"transaction_by_order_id": `SELECT id, order_id, type 
 			FROM storage_transactions WHERE order_id=$1::bigint;`,
-		"create_transaction": `INSERT 
-			INTO storage_transactions(order_id, type) 
-			VALUES($1::bigint, $2::smallint);`,
+		"create_transaction": `INSERT INTO storage_transactions(order_id, type) VALUES($1::bigint, $2::smallint) RETURNING id, order_id, type;`,
 		"create_transaction_item": `INSERT INTO 
 			storage_transaction_items(product_id, transaction_id, order_id, count) 
-			VALUES($1::int, $2::bigint, $3::bigint, $4::int);`,
+			VALUES($1::int, $2::bigint, $3::bigint, $4::int)
+			RETURNING id, product_id, transaction_id, count;`,
 	}
 
 	submitPreparedStatements(ctx, queriesMap, dbConn)

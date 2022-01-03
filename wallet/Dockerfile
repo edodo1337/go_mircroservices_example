@@ -1,16 +1,22 @@
-FROM registry.gitlab.com/gitlab-org/gitlab-build-images:golangci-lint-alpine as builder
-WORKDIR /build
+FROM golang:1.17-alpine as builder
+WORKDIR /app
 
-COPY go.* /build/
+COPY go.* /app/
 RUN go mod download
-COPY . /build/
+COPY . /app/
 
-RUN CGO_ENABLED=0 GOOS=linux go build -a -o auth ./cmd
+RUN CGO_ENABLED=0 GOOS=linux go build -a -o wallet ./cmd
 
-# generate clean, final image for end users
-FROM quay.io/jitesoft/alpine:3.11.3
-COPY --from=builder /build/auth .
-COPY --from=builder /build/config.yaml .
 
-# executable
-ENTRYPOINT ["./auth"]
+FROM alpine:3.9 
+
+WORKDIR /root/
+
+COPY --from=builder /app/ /root/
+COPY --from=builder /app/config.yaml /root/
+
+EXPOSE 8001
+
+ENTRYPOINT ["./wallet"]
+
+

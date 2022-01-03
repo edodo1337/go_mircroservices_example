@@ -25,5 +25,6 @@ type OrderItemsDAO interface {
 
 type ProductPricesDAO interface {
 	GetMap(ctx context.Context, productIDs []uint) (ProductPricesMap, error)
+	GetList(ctx context.Context) ([]*models.Product, error)
 	HealthCheck(ctx context.Context) error
 }

@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"errors"
 	in "storage_service/internal/app/interfaces"
 	"storage_service/internal/app/models"
 	"time"
@@ -12,6 +13,8 @@ func (s *StorageService) MakeReservation(
 	ctx context.Context,
 	orderData *in.OrderDTO,
 ) error {
+	s.logger.Info("Making reservation", orderData)
+
 	items := make([]*in.TransactionItem, 0, 10)
 	for _, v := range orderData.OrderItems {
 		items = append(items, &in.TransactionItem{
@@ -22,6 +25,7 @@ func (s *StorageService) MakeReservation(
 
 	trans := &in.Transaction{
 		OrderID: orderData.OrderID,
+		UserID:  orderData.UserID,
 		Items:   items,
 		Type:    models.Reservation,
 	}
@@ -32,6 +36,8 @@ func (s *StorageService) MakeReservation(
 		return in.ErrNewTransactionTimeoutError
 	}
 
+	s.logger.Info("Reservation success")
+
 	return nil
 }
 
@@ -40,8 +46,10 @@ func (s *StorageService) MakeCancelation(
 	ctx context.Context,
 	orderData in.CancelOrderDTO,
 ) error {
+	s.logger.Info("Making cancelation")
+
 	transItems, err := s.storageTransactionsDAO.GetItemsByOrderID(ctx, orderData.OrderID)
-	if err != nil {
+	if err != nil && !errors.Is(err, in.ErrTransNotFound) {
 		return err
 	}
 
@@ -65,6 +73,8 @@ func (s *StorageService) MakeCancelation(
 		return in.ErrNewTransactionTimeoutError
 	}
 
+	s.logger.Info("Cancelation success")
+
 	return nil
 }
 
@@ -74,17 +84,27 @@ func (s *StorageService) ProcessTransactionsPipe(ctx context.Context) {
 		case trans := <-s.transactionsPipe:
 			switch trans.Type {
 			case models.Reservation:
-				err := s.processReservation(ctx, trans)
+				code, err := s.processReservation(ctx, trans)
 				if err != nil {
-					s.logger.Error("got process reservation error")
+					s.logger.Error("got process reservation error: ", err, code)
 
 					trans.Type = models.Cancelation
 					s.transactionsPipe <- trans
+
+					errSend := s.sendRejectedMsg(ctx, code, trans)
+					if errSend != nil {
+						s.logger.Error("send rejected msg error: ", errSend)
+					}
+				}
+
+				errSend := s.sendSuccessMsg(ctx, trans)
+				if errSend != nil {
+					s.logger.Error("send success msg error: ", errSend)
 				}
 			case models.Cancelation:
 				err := s.processCancelation(ctx, trans)
 				if err != nil {
-					s.logger.Error("got process cancellation error")
+					s.logger.Error("got process cancellation error: ", err)
 				}
 			default:
 				s.logger.Error("Invalid transaction type")
@@ -98,14 +118,18 @@ func (s *StorageService) ProcessTransactionsPipe(ctx context.Context) {
 	}
 }
 
-func (s *StorageService) processReservation(ctx context.Context, data *in.Transaction) error {
+func (s *StorageService) processReservation(ctx context.Context, data *in.Transaction) (models.CancelationReason, error) {
+	s.logger.Info("Processing reservation")
+
 	existingTrans, err := s.storageTransactionsDAO.GetByOrderID(ctx, data.OrderID)
-	if err != nil {
-		return err
+	if err != nil && !errors.Is(err, in.ErrTransNotFound) {
+		s.logger.Error("got process reservation err: ", err)
+
+		return models.InternalError, err
 	}
 
 	if existingTrans != nil {
-		return nil
+		return models.OK, nil
 	}
 
 	items := make([]*in.CreateStorageTransactionItemDTO, 0, 10)
@@ -116,15 +140,6 @@ func (s *StorageService) processReservation(ctx context.Context, data *in.Transa
 		})
 	}
 
-	newTrans, err := s.storageTransactionsDAO.Create(ctx, &in.CreateStorageTransactionDTO{
-		OrderID: data.OrderID,
-		Items:   items,
-		Type:    data.Type,
-	})
-	if err != nil {
-		return err
-	}
-
 	productIDs := make([]uint, 0, 10)
 	for _, v := range data.Items {
 		productIDs = append(productIDs, v.ProductID)
@@ -132,35 +147,65 @@ func (s *StorageService) processReservation(ctx context.Context, data *in.Transa
 
 	storageItems, err := s.storageItemsDAO.GetListByProductIDs(ctx, productIDs)
 	if err != nil {
-		return err
+		return models.InternalError, err
 	}
 
-	itemsMap := makeStorageItemsMap(storageItems)
-	transMap := makeTransItemsMap(newTrans.Items)
+	storageItemsMap := makeStorageItemsMap(storageItems)
+	transItemsMap := makeTransItemsMap(items)
 
-	for k, v := range transMap {
-		product, exists := itemsMap[k]
+	for k, v := range transItemsMap {
+		product, exists := storageItemsMap[k]
 		if !exists {
-			return in.ErrProductNotFoundByID
+			return models.InternalError, in.ErrProductNotFoundByID
 		}
 
 		if product.Count < v.Count {
-			return in.ErrOutOfStock
+			return models.OutOfStock, in.ErrOutOfStock
 		}
 
 		product.Count -= v.Count
 	}
 
-	if err := s.storageItemsDAO.UpdateCountBulk(ctx, storageItems); err != nil {
-		return err
+	_, err = s.storageTransactionsDAO.Create(ctx, &in.CreateStorageTransactionDTO{
+		OrderID: data.OrderID,
+		Items:   items,
+		Type:    data.Type,
+	})
+	if err != nil {
+		return models.InternalError, err
 	}
 
-	return nil
+	if errUpd := s.storageItemsDAO.UpdateCountBulk(ctx, storageItems); errUpd != nil {
+		s.logger.Error("got process reservation update count err:", errUpd)
+
+		return models.InternalError, errUpd
+	}
+
+	s.logger.Info("Processing reservation success")
+
+	err = s.brokerClient.SendReservationSuccess(ctx, &in.OrderSuccessMsg{
+		OrderID: data.OrderID,
+		Service: in.Storage,
+	})
+	if err != nil {
+		s.logger.Info("Send reservation msg error")
+	}
+
+	s.logger.Info("Processing reservation success")
+
+	return models.OK, nil
 }
 
 func (s *StorageService) processCancelation(ctx context.Context, data *in.Transaction) error {
+	s.logger.Info("Processing cancelation")
+
 	existingTrans, err := s.storageTransactionsDAO.GetByOrderID(ctx, data.OrderID)
-	if err != nil {
+
+	if errors.Is(err, in.ErrTransNotFound) {
+		s.logger.Info("Processing cancelation success: order not found")
+
+		return nil
+	} else if err != nil {
 		return err
 	}
 
@@ -176,15 +221,6 @@ func (s *StorageService) processCancelation(ctx context.Context, data *in.Transa
 		})
 	}
 
-	newTrans, err := s.storageTransactionsDAO.Create(ctx, &in.CreateStorageTransactionDTO{
-		OrderID: data.OrderID,
-		Items:   items,
-		Type:    data.Type,
-	})
-	if err != nil {
-		return err
-	}
-
 	productIDs := make([]uint, 0, 10)
 	for _, v := range data.Items {
 		productIDs = append(productIDs, v.ProductID)
@@ -195,25 +231,34 @@ func (s *StorageService) processCancelation(ctx context.Context, data *in.Transa
 		return err
 	}
 
-	itemsMap := makeStorageItemsMap(storageItems)
-	transMap := makeTransItemsMap(newTrans.Items)
+	storageItemsMap := makeStorageItemsMap(storageItems)
+	transItemsMap := makeTransItemsMap(items)
 
-	for k, v := range transMap {
-		product, exists := itemsMap[k]
+	for k, v := range transItemsMap {
+		product, exists := storageItemsMap[k]
 		if !exists {
 			return in.ErrProductNotFoundByID
-		}
-
-		if product.Count < v.Count {
-			return in.ErrOutOfStock
 		}
 
 		product.Count += v.Count
 	}
 
-	if err := s.storageItemsDAO.UpdateCountBulk(ctx, storageItems); err != nil {
+	_, err = s.storageTransactionsDAO.Create(ctx, &in.CreateStorageTransactionDTO{
+		OrderID: data.OrderID,
+		Items:   items,
+		Type:    data.Type,
+	})
+	if err != nil {
 		return err
 	}
+
+	if err := s.storageItemsDAO.UpdateCountBulk(ctx, storageItems); err != nil {
+		s.logger.Error("got process cancelation update count err:", err)
+
+		return err
+	}
+
+	s.logger.Info("Processing cancelation success")
 
 	return nil
 }
@@ -262,13 +307,19 @@ func (s *StorageService) ConsumeRejectedOrderMsgLoop(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			msg, err := s.brokerClient.GetOrderRejectedMsg(ctx)
+
+			if msg.Service == in.Storage {
+				s.logger.Info("Got message for storage. Skip")
+
+				continue
+			}
+
 			if err == nil {
 				s.logger.Debug("Kafka rejected order msg:", msg)
 
 				cancelOrderData := &in.CancelOrderDTO{
 					OrderID: msg.OrderID,
 					UserID:  msg.UserID,
-					Cost:    msg.Cost,
 				}
 
 				if cancelErr := s.MakeCancelation(ctx, *cancelOrderData); cancelErr != nil {

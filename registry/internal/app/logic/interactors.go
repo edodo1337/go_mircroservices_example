@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+// Get products list
+func (s *OrdersService) GetProductList(ctx context.Context) ([]*models.Product, error) {
+	products, err := s.productPricesDAO.GetList(ctx)
+
+	return products, err
+}
+
 // Get orders list by user_id
 func (s *OrdersService) GetOrdersList(ctx context.Context, userID uint) ([]*models.Order, error) {
 	orders, err := s.ordersDAO.GetListByUserID(ctx, userID)
@@ -20,6 +27,8 @@ func (s *OrdersService) MakeOrder(
 	ctx context.Context,
 	makeOrderData in.MakeOrderDTO,
 ) error {
+	s.logger.Info("Making order")
+
 	productIDs := make([]uint, 0, 5)
 
 	for _, item := range makeOrderData.OrderItems {
@@ -44,6 +53,8 @@ func (s *OrdersService) MakeOrder(
 		return in.ErrNewOrderTimeout
 	}
 
+	s.logger.Info("Making order success")
+
 	return nil
 }
 
@@ -58,7 +69,7 @@ func (s *OrdersService) NewOrdersPipeline(
 		case <-ctx.Done():
 			return
 		case orderData := <-s.newOrdersPipe:
-			s.logger.Debug("OrderDATA:", *orderData)
+			s.logger.Info("New order data: ", *orderData)
 
 			err := s.processNewOrder(ctx, orderData)
 			if err != nil {
@@ -92,9 +103,15 @@ func (s *OrdersService) processNewOrder(
 
 	orderItems, err := s.orderItemsDAO.CreateBulk(ctx, order.ID, orderItemsData)
 	if err != nil {
-		// TODO dont delete but mark as rejected
-		// or implement transactions
-		s.ordersDAO.Delete(ctx, order.ID)
+		_, errUpd := s.ordersDAO.UpdateStatus(
+			ctx,
+			order.ID,
+			models.Rejected,
+			models.InternalError,
+		)
+		if errUpd != nil {
+			return errUpd
+		}
 
 		return err
 	}
@@ -103,9 +120,16 @@ func (s *OrdersService) processNewOrder(
 
 	err = s.sendNewOrderMsg(ctx, order)
 	if err != nil {
-		// TODO dont delete but mark as rejected
-		// or implement transactions
-		s.ordersDAO.Delete(ctx, order.ID)
+		_, errUpd := s.ordersDAO.UpdateStatus(
+			ctx,
+			order.ID,
+			models.Rejected,
+			models.InternalError,
+		)
+
+		if errUpd != nil {
+			return errUpd
+		}
 
 		return err
 	}
@@ -115,6 +139,8 @@ func (s *OrdersService) processNewOrder(
 
 // Sends msg about new order to queue.
 func (s *OrdersService) sendNewOrderMsg(ctx context.Context, order *models.Order) error {
+	s.logger.Logger.Debug("Send new order msg")
+
 	items := make([]in.NewOrderMsgItem, 0, 10)
 
 	for _, v := range order.OrderItems {
@@ -147,6 +173,14 @@ func (s *OrdersService) ConsumeRejectedOrderMsgLoop(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			msg, err := s.brokerClient.GetOrderRejectedMsg(ctx)
+			if msg.Service == in.Registry {
+				s.logger.Info("Got message for wallet. Skip")
+
+				continue
+			}
+
+			s.logger.Info("New rejected order msg", msg)
+
 			if err == nil {
 				s.logger.Debug("Kafka rejected order msg:", msg)
 
@@ -161,4 +195,56 @@ func (s *OrdersService) ConsumeRejectedOrderMsgLoop(ctx context.Context) {
 			return
 		}
 	}
+}
+
+func (s *OrdersService) ConsumeSuccessMsgLoop(ctx context.Context) {
+	ticker := time.NewTicker(s.consumeLoopTick)
+
+	for {
+		select {
+		case <-ticker.C:
+			msg, err := s.brokerClient.GetSuccessMsg(ctx)
+			if err != nil {
+				s.logger.Error("Error get success msg from kafka: ", err)
+			}
+
+			s.logger.Info("New success msg", msg)
+
+			err = s.processSuccessMsg(ctx, msg)
+			if err != nil {
+				s.logger.Error("Error process success msg: ", err)
+			}
+
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (s *OrdersService) processSuccessMsg(ctx context.Context, msg *in.OrderSuccessMsg) error {
+	order, err := s.ordersDAO.GetByID(ctx, msg.OrderID)
+	if err != nil {
+		return err
+	}
+
+	switch msg.Service {
+	case in.Storage:
+		if order.Status == models.Paid {
+			order.Status = models.Completed
+		} else {
+			order.Status = models.Reserved
+		}
+	case in.Wallet:
+		if order.Status == models.Reserved {
+			order.Status = models.Completed
+		} else {
+			order.Status = models.Paid
+		}
+	case in.Registry:
+	default:
+	}
+
+	_, err = s.ordersDAO.UpdateStatus(ctx, order.ID, order.Status, models.OK)
+
+	return err
 }

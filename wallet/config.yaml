@@ -1,16 +1,18 @@
 # Server configs
 server:
-  # host: "0.0.0.0"
-  host: "localhost"
+  host: "0.0.0.0"
+  # host: "localhost"
   port: 8001
   prefix: "wallet"
-  jwt_access_secret: "epstein didnt kill himself"
-  jwt_refresh_secret: "epstein didnt kill himself"
+  jwt_access_secret: "hollow earth theory"
+  jwt_refresh_secret: "pizza gate"
   transactions_pipe_cap: 100
 
 # Database credentials
 wallet_database:
-  host: "localhost"
+  host: "services_postgres"
+  # host: "localhost"
+  port: 5432
   user: "user"
   password: "password"
   db_name: "mydb"
@@ -22,17 +24,19 @@ wallet_database:
 kafka:
   new_orders_topic: "new_orders"
   rejected_orders_topic: "rejected_orders"
+  success_topic: "success_topic"
   group_id: "wallet"
   external_clients_port: 9092
   internal_clients_port: 9093
-  brokers: ["localhost:9093"]
+  brokers: ["services_kafka:9093"]
+  # brokers: ["localhost:9093"]
   send_msg_timeout: 5
   consume_loop_tick: 500
   
 
 # Logger configs
 logger:
-  level: "INFO" 
+  log_level: "INFO" 
 
 
   
