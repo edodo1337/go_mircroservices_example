@@ -13,11 +13,11 @@
 
 
 ## Доступные эндпоинты: 
-* **0.0.0.0:8000/orders/ [POST] - создание заказа
-* **0.0.0.0:8000/orders?user_id=<id> [GET] - список заказов
-* **0.0.0.0:8000/products/ [GET] - список продуктов (чтобы узнать айдишники, передлывать на sku мне лень)
-* **0.0.0.0:<SERVICE_PORT>/health(?timeout=<seconds>) [GET] - healthcheck для каждого сервиса
-* **0.0.0.0:<SERVICE_PORT>/swagger/ - сваггер для каждого сервиса
+* **0.0.0.0:8000/orders/** [POST] - создание заказа
+* **0.0.0.0:8000/orders?user_id=<id>** [GET] - список заказов
+* **0.0.0.0:8000/products/** [GET] - список продуктов (чтобы узнать айдишники, передлывать на sku мне лень)
+* **0.0.0.0:<SERVICE_PORT>/health(?timeout=<seconds>)** [GET] - healthcheck для каждого сервиса
+* **0.0.0.0:<SERVICE_PORT>/swagger/** - сваггер для каждого сервиса
 
 ## Пара скринов:
 ![Screenshot](report/topics.png)
