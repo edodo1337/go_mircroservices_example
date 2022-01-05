@@ -14,6 +14,7 @@ type OrdersDAO interface {
 	GetByID(ctx context.Context, orderID uint) (*models.Order, error)
 	UpdateStatus(ctx context.Context, orderID uint, status models.OrderStatus, reasonCode models.CancelationReason) (*models.Order, error)
 	HealthCheck(ctx context.Context) error
+	Close()
 }
 
 type OrderItemsDAO interface {
@@ -21,10 +22,12 @@ type OrderItemsDAO interface {
 	Create(ctx context.Context, orderID uint, data *CreateOrderItemDTO) (*models.OrderItem, error)
 	GetByID(ctx context.Context, orderItemID uint) (*models.OrderItem, error)
 	HealthCheck(ctx context.Context) error
+	Close()
 }
 
 type ProductPricesDAO interface {
 	GetMap(ctx context.Context, productIDs []uint) (ProductPricesMap, error)
 	GetList(ctx context.Context) ([]*models.Product, error)
 	HealthCheck(ctx context.Context) error
+	Close()
 }

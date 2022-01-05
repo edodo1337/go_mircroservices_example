@@ -38,3 +38,7 @@ func NewPaymentService(
 		logger:                 logger,
 	}
 }
+
+func (s *PaymentService) Close() {
+	close(s.transactionsPipe)
+}

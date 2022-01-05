@@ -31,13 +31,7 @@ func NewStorageApp(ctx context.Context) *App {
 		parseLogLevel(config.Logger.LogLevel),
 	)
 
-	brokerClient, err := broker.NewKafkaClient(
-		config.Kafka.Brokers,
-		config.Kafka.NewOrdersTopic,
-		config.Kafka.RejectedOrdersTopic,
-		config.Kafka.SuccessTopic,
-		config.Kafka.GroupID,
-	)
+	brokerClient, err := broker.NewKafkaClient(config)
 	if err != nil {
 		panic(err)
 	}
@@ -63,4 +57,12 @@ func NewStorageApp(ctx context.Context) *App {
 	}
 
 	return &app
+}
+
+func (app *App) Close() {
+	app.StorageService.Close()
+	app.BrokerClient.CloseReader()
+	app.BrokerClient.CloseWriter()
+	app.StorageItemsDAO.Close()
+	app.StorageTransactionsDAO.Close()
 }

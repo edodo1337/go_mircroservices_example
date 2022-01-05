@@ -41,8 +41,9 @@ func (s *Server) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	go s.App.OrdersService.NewOrdersPipeline(ctx)
+	go s.App.OrdersService.EventPipeProcessor(ctx)
 	go s.App.OrdersService.ConsumeRejectedOrderMsgLoop(ctx)
+	go s.App.OrdersService.ConsumeSuccessMsgLoop(ctx)
 
 	if err := s.Serv.ListenAndServe(); err != nil {
 		return err
@@ -52,6 +53,7 @@ func (s *Server) Run(ctx context.Context) error {
 }
 
 func (s *Server) Shutdown() {
+	s.App.Close()
 	s.Serv.Close()
 }
 

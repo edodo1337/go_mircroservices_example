@@ -25,7 +25,7 @@ func (s *OrdersService) GetOrdersList(ctx context.Context, userID uint) ([]*mode
 // Enriches new order data with pricing and redirects flow to NewOrdersPipeline
 func (s *OrdersService) MakeOrder(
 	ctx context.Context,
-	makeOrderData in.MakeOrderDTO,
+	makeOrderData *in.MakeOrderDTO,
 ) error {
 	s.logger.Info("Making order")
 
@@ -51,6 +51,8 @@ func (s *OrdersService) MakeOrder(
 	case s.newOrdersPipe <- newOrderDTO:
 	case <-time.After(s.sendMsgTimeout * time.Second):
 		return in.ErrNewOrderTimeout
+	case <-ctx.Done():
+		return nil
 	}
 
 	s.logger.Info("Making order success")
@@ -58,112 +60,92 @@ func (s *OrdersService) MakeOrder(
 	return nil
 }
 
-// New orders pipeline processor.
-// Gathers incoming item from ordersPipe channel
-// and processes new order.
-func (s *OrdersService) NewOrdersPipeline(
+// Entry point for orders cancelation.
+func (s *OrdersService) MakeCancelation(
+	ctx context.Context,
+	cancelData *in.OrderRejectedMsg,
+) error {
+	s.logger.Info("Making cancelation")
+
+	select {
+	case s.rejectedOrdersPipe <- cancelData:
+	case <-time.After(s.sendMsgTimeout * time.Second):
+		return in.ErrNewOrderTimeout
+	case <-ctx.Done():
+		return nil
+	}
+
+	s.logger.Info("Making cancelation success")
+
+	return nil
+}
+
+// Entry point for mark order success step:
+// Paid, Reserved ...
+func (s *OrdersService) MarkSuccessStep(
+	ctx context.Context,
+	successData *in.OrderSuccessMsg,
+) error {
+	s.logger.Info("Marking order as successful")
+
+	select {
+	case s.successOrdersPipe <- successData:
+	case <-time.After(s.sendMsgTimeout * time.Second):
+		return in.ErrNewOrderTimeout
+	case <-ctx.Done():
+		return nil
+	}
+
+	s.logger.Info("Making cancelation success")
+
+	return nil
+}
+
+// New events pipeline processor.
+// Gathers incoming item from pipe channels
+// and processes new order, cancelation and success msg.
+func (s *OrdersService) EventPipeProcessor(
 	ctx context.Context,
 ) {
 	for {
 		select {
-		case <-ctx.Done():
-			return
-		case orderData := <-s.newOrdersPipe:
+		case orderData, ok := <-s.newOrdersPipe:
+			if !ok {
+				return
+			}
+
 			s.logger.Info("New order data: ", *orderData)
 
 			err := s.processNewOrder(ctx, orderData)
 			if err != nil {
-				s.logger.Error("Err process order:", err)
+				s.logger.Error("Err process order: ", err)
 			}
+		case cancelData, ok := <-s.rejectedOrdersPipe:
+			if !ok {
+				return
+			}
+
+			s.logger.Info("New cancelation data: ", *cancelData)
+
+			err := s.processCancelation(ctx, cancelData)
+			if err != nil {
+				s.logger.Error("Err process cancelation: ", err)
+			}
+		case successData, ok := <-s.successOrdersPipe:
+			if !ok {
+				return
+			}
+
+			s.logger.Info("New success order data: ", *successData)
+
+			err := s.processSuccess(ctx, successData)
+			if err != nil {
+				s.logger.Error("Err process success order: ", err)
+			}
+		case <-ctx.Done():
+			return
 		}
 	}
-}
-
-// Handles new order, deals with data layer,
-// sends new order msg to queue.
-func (s *OrdersService) processNewOrder(
-	ctx context.Context,
-	newOrderData *in.NewOrderDTO,
-) error {
-	orderData := &in.CreateOrderDTO{UserID: newOrderData.UserID}
-
-	order, err := s.ordersDAO.Create(ctx, orderData)
-	if err != nil {
-		return err
-	}
-
-	orderItemsData := make([]*in.CreateOrderItemDTO, 0, 5)
-	for _, v := range newOrderData.OrderItems {
-		orderItemsData = append(orderItemsData, &in.CreateOrderItemDTO{
-			ProductID:    v.ProductID,
-			Count:        v.Count,
-			ProductPrice: v.ProductPrice,
-		})
-	}
-
-	orderItems, err := s.orderItemsDAO.CreateBulk(ctx, order.ID, orderItemsData)
-	if err != nil {
-		_, errUpd := s.ordersDAO.UpdateStatus(
-			ctx,
-			order.ID,
-			models.Rejected,
-			models.InternalError,
-		)
-		if errUpd != nil {
-			return errUpd
-		}
-
-		return err
-	}
-
-	order.OrderItems = orderItems
-
-	err = s.sendNewOrderMsg(ctx, order)
-	if err != nil {
-		_, errUpd := s.ordersDAO.UpdateStatus(
-			ctx,
-			order.ID,
-			models.Rejected,
-			models.InternalError,
-		)
-
-		if errUpd != nil {
-			return errUpd
-		}
-
-		return err
-	}
-
-	return nil
-}
-
-// Sends msg about new order to queue.
-func (s *OrdersService) sendNewOrderMsg(ctx context.Context, order *models.Order) error {
-	s.logger.Logger.Debug("Send new order msg")
-
-	items := make([]in.NewOrderMsgItem, 0, 10)
-
-	for _, v := range order.OrderItems {
-		items = append(items, in.NewOrderMsgItem{
-			OrderID:      order.ID,
-			ProductID:    v.ProductID,
-			Count:        v.Count,
-			ProductPrice: v.ProductPrice,
-		})
-	}
-
-	msg := &in.NewOrderMsg{
-		UserID:     order.UserID,
-		OrderID:    order.ID,
-		OrderItems: items,
-	}
-
-	err := s.brokerClient.SendNewOrderMsg(ctx, msg)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (s *OrdersService) ConsumeRejectedOrderMsgLoop(ctx context.Context) {
@@ -173,23 +155,21 @@ func (s *OrdersService) ConsumeRejectedOrderMsgLoop(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			msg, err := s.brokerClient.GetOrderRejectedMsg(ctx)
-			if msg.Service == in.Registry {
-				s.logger.Info("Got message for wallet. Skip")
-
-				continue
-			}
-
-			s.logger.Info("New rejected order msg", msg)
-
 			if err == nil {
-				s.logger.Debug("Kafka rejected order msg:", msg)
+				if msg.Service == in.Registry {
+					s.logger.Info("Got message for registry. Skip")
 
-				_, updateErr := s.ordersDAO.UpdateStatus(ctx, msg.OrderID, models.Rejected, msg.ReasonCode)
-				if updateErr != nil {
-					s.logger.Error("rejected order update err", updateErr)
+					continue
+				}
+
+				s.logger.Info("Kafka rejected order msg: ", msg)
+
+				errCancel := s.MakeCancelation(ctx, msg)
+				if errCancel != nil {
+					s.logger.Errorf("Order cancelation error: %v", errCancel)
 				}
 			} else {
-				s.logger.Error("get order rejected msg err", err)
+				s.logger.Error("got order rejected msg err: ", err)
 			}
 		case <-ctx.Done():
 			return
@@ -205,46 +185,17 @@ func (s *OrdersService) ConsumeSuccessMsgLoop(ctx context.Context) {
 		case <-ticker.C:
 			msg, err := s.brokerClient.GetSuccessMsg(ctx)
 			if err != nil {
-				s.logger.Error("Error get success msg from kafka: ", err)
+				s.logger.Error("Error get success order msg from kafka: ", err)
 			}
 
-			s.logger.Info("New success msg", msg)
+			s.logger.Info("New success order msg", msg)
 
-			err = s.processSuccessMsg(ctx, msg)
-			if err != nil {
-				s.logger.Error("Error process success msg: ", err)
+			errCancel := s.MarkSuccessStep(ctx, msg)
+			if errCancel != nil {
+				s.logger.Errorf("Make success steo error: %v", errCancel)
 			}
-
 		case <-ctx.Done():
 			return
 		}
 	}
-}
-
-func (s *OrdersService) processSuccessMsg(ctx context.Context, msg *in.OrderSuccessMsg) error {
-	order, err := s.ordersDAO.GetByID(ctx, msg.OrderID)
-	if err != nil {
-		return err
-	}
-
-	switch msg.Service {
-	case in.Storage:
-		if order.Status == models.Paid {
-			order.Status = models.Completed
-		} else {
-			order.Status = models.Reserved
-		}
-	case in.Wallet:
-		if order.Status == models.Reserved {
-			order.Status = models.Completed
-		} else {
-			order.Status = models.Paid
-		}
-	case in.Registry:
-	default:
-	}
-
-	_, err = s.ordersDAO.UpdateStatus(ctx, order.ID, order.Status, models.OK)
-
-	return err
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	in "registry_service/internal/app/interfaces"
+	"registry_service/internal/pkg/conf"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -20,35 +21,39 @@ type KafkaClient struct {
 	healthCheckTopic string
 }
 
-func NewKafkaClient(brokers []string, newOrdersTopic, rejectedOrdersTopic, successTopic, groupID string) (*KafkaClient, error) {
-	if len(brokers) == 0 ||
-		brokers[0] == "" ||
-		newOrdersTopic == "" ||
-		rejectedOrdersTopic == "" ||
-		successTopic == "" ||
-		groupID == "" {
+func NewKafkaClient(config *conf.Config) (*KafkaClient, error) {
+	c := config.Kafka
+
+	if len(c.Brokers) == 0 ||
+		c.Brokers[0] == "" ||
+		c.NewOrdersTopic == "" ||
+		c.RejectedOrdersTopic == "" ||
+		c.SuccessTopic == "" ||
+		c.GroupID == "" {
 		return nil, in.ErrInvalidBrokerConnParams
 	}
 
-	c := KafkaClient{
-		brokers:          brokers,
+	client := KafkaClient{
+		brokers:          c.Brokers,
 		healthCheckTopic: "healthcheck",
 	}
 
-	c.ReaderFail = kafka.NewReader(kafka.ReaderConfig{
-		Brokers:  brokers,
-		Topic:    rejectedOrdersTopic,
-		GroupID:  groupID,
+	client.ReaderFail = kafka.NewReader(kafka.ReaderConfig{
+		Brokers:  c.Brokers,
+		Topic:    c.RejectedOrdersTopic,
+		GroupID:  c.GroupID,
 		MinBytes: 10e1,
 		MaxBytes: 10e6,
+		MaxWait:  time.Duration(c.MaxWait) * time.Millisecond,
 	})
 
-	c.ReaderSuccess = kafka.NewReader(kafka.ReaderConfig{
-		Brokers:  brokers,
-		Topic:    successTopic,
-		GroupID:  groupID,
+	client.ReaderSuccess = kafka.NewReader(kafka.ReaderConfig{
+		Brokers:  c.Brokers,
+		Topic:    c.SuccessTopic,
+		GroupID:  c.GroupID,
 		MinBytes: 10e1,
 		MaxBytes: 10e6,
+		MaxWait:  time.Duration(c.MaxWait) * time.Millisecond,
 	})
 
 	dialer := &kafka.Dialer{
@@ -56,15 +61,15 @@ func NewKafkaClient(brokers []string, newOrdersTopic, rejectedOrdersTopic, succe
 		DualStack: true,
 	}
 
-	c.Writer = kafka.NewWriter(kafka.WriterConfig{
-		Brokers:      brokers,
-		Topic:        newOrdersTopic,
+	client.Writer = kafka.NewWriter(kafka.WriterConfig{
+		Brokers:      c.Brokers,
+		Topic:        c.NewOrdersTopic,
 		Balancer:     &kafka.LeastBytes{},
 		Dialer:       dialer,
 		RequiredAcks: -1,
 	})
 
-	return &c, nil
+	return &client, nil
 }
 
 func (c *KafkaClient) SendNewOrderMsg(ctx context.Context, msg *in.NewOrderMsg) error {
@@ -83,7 +88,7 @@ func (c *KafkaClient) SendNewOrderMsg(ctx context.Context, msg *in.NewOrderMsg) 
 }
 
 func (c *KafkaClient) GetOrderRejectedMsg(ctx context.Context) (*in.OrderRejectedMsg, error) {
-	data, err := c.ReaderFail.ReadMessage(context.Background())
+	data, err := c.ReaderFail.ReadMessage(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +100,7 @@ func (c *KafkaClient) GetOrderRejectedMsg(ctx context.Context) (*in.OrderRejecte
 }
 
 func (c *KafkaClient) GetSuccessMsg(ctx context.Context) (*in.OrderSuccessMsg, error) {
-	data, err := c.ReaderSuccess.ReadMessage(context.Background())
+	data, err := c.ReaderSuccess.ReadMessage(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +165,7 @@ func (c *KafkaClient) ConsumeHealthCheckMsg(ctx context.Context) ([]byte, error)
 	})
 	defer reader.Close()
 
-	data, err := reader.ReadMessage(context.Background())
+	data, err := reader.ReadMessage(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -9,6 +9,7 @@ type StorageItemsDAO interface {
 	GetListByProductIDs(ctx context.Context, prodIDs []uint) ([]*models.StorageItem, error)
 	UpdateCountBulk(ctx context.Context, items []*models.StorageItem) error
 	HealthCheck(ctx context.Context) error
+	Close()
 }
 
 type StorageTransactionsDAO interface {
@@ -16,4 +17,5 @@ type StorageTransactionsDAO interface {
 	GetItemsByOrderID(ctx context.Context, orderID uint) ([]*models.StorageTransactionItem, error)
 	Create(ctx context.Context, trans *CreateStorageTransactionDTO) (*models.StorageTransaction, error)
 	HealthCheck(ctx context.Context) error
+	Close()
 }

@@ -45,7 +45,7 @@ func (s *PaymentService) MakeCancelation(
 	ctx context.Context,
 	orderData in.CancelOrderDTO,
 ) error {
-	s.logger.Info("Making cancelation", orderData)
+	s.logger.Info("Making cancelation: ", orderData)
 
 	wallet, err := s.walletsDAO.GetByUserID(ctx, orderData.UserID)
 	if err != nil {
@@ -79,10 +79,14 @@ func (s *PaymentService) MakeCancelation(
 	return nil
 }
 
-func (s *PaymentService) ProcessTransactionsPipe(ctx context.Context) {
+func (s *PaymentService) EventPipeProcessor(ctx context.Context) {
 	for {
 		select {
-		case trans := <-s.transactionsPipe:
+		case trans, ok := <-s.transactionsPipe:
+			if !ok {
+				return
+			}
+
 			switch trans.Type {
 			case models.Purchase:
 				code, err := s.processPurchase(ctx, trans)
@@ -197,7 +201,7 @@ func (s *PaymentService) ConsumeNewOrderMsgLoop(ctx context.Context) {
 		case <-ticker.C:
 			msg, err := s.brokerClient.GetNewOrderMsg(ctx)
 			if err == nil {
-				s.logger.Debug("Kafka new order msg:", msg)
+				s.logger.Debug("Kafka new order msg: ", msg)
 
 				orderItemsData := make([]*in.OrderItemDTO, 0, 10)
 				for _, v := range msg.OrderItems {
@@ -215,10 +219,10 @@ func (s *PaymentService) ConsumeNewOrderMsgLoop(ctx context.Context) {
 				}
 
 				if purchaseErr := s.MakePurchase(ctx, &orderData); purchaseErr != nil {
-					s.logger.Error("new order make purchase err", purchaseErr)
+					s.logger.Error("new order make purchase err: ", purchaseErr)
 				}
 			} else {
-				s.logger.Error("got new order msg err", err)
+				s.logger.Error("got new order msg err: ", err)
 			}
 		case <-ctx.Done():
 			return
@@ -233,15 +237,14 @@ func (s *PaymentService) ConsumeRejectedOrderMsgLoop(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			msg, err := s.brokerClient.GetOrderRejectedMsg(ctx)
-
-			if msg.Service == in.Wallet {
-				s.logger.Info("Got message for wallet. Skip")
-
-				continue
-			}
-
 			if err == nil {
 				s.logger.Debug("Kafka rejected order msg:", msg)
+
+				if msg.Service == in.Wallet {
+					s.logger.Info("Got message for wallet. Skip")
+
+					continue
+				}
 
 				cancelOrderData := &in.CancelOrderDTO{
 					OrderID: msg.OrderID,

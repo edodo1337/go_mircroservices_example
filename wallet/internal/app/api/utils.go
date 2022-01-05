@@ -43,7 +43,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	go s.App.PaymentService.ConsumeNewOrderMsgLoop(ctx)
 	go s.App.PaymentService.ConsumeRejectedOrderMsgLoop(ctx)
-	go s.App.PaymentService.ProcessTransactionsPipe(ctx)
+	go s.App.PaymentService.EventPipeProcessor(ctx)
 
 	if err := s.Serv.ListenAndServe(); err != nil {
 		return err
@@ -53,6 +53,7 @@ func (s *Server) Run(ctx context.Context) error {
 }
 
 func (s *Server) Shutdown() {
+	s.App.Close()
 	s.Serv.Close()
 }
 

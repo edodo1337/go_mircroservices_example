@@ -66,6 +66,9 @@ func (dao *InMemoryOrdersDAO) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
+func (dao *InMemoryOrdersDAO) Close() {
+}
+
 func NewInMemoryOrdersDAO() *InMemoryOrdersDAO {
 	return &InMemoryOrdersDAO{
 		OrdersKVStore: make(map[uint]*models.Order),
@@ -126,6 +129,9 @@ func (dao *InMemoryOrderItemsDAO) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
+func (dao *InMemoryOrderItemsDAO) Close() {
+}
+
 func NewInMemoryOrderItemsDAO() *InMemoryOrderItemsDAO {
 	return &InMemoryOrderItemsDAO{
 		OrderItemsKVStore: make(map[uint]*models.OrderItem),
@@ -164,6 +170,9 @@ func (dao *InMemoryProductPricesDAO) GetList(ctx context.Context) ([]*models.Pro
 
 func (dao *InMemoryProductPricesDAO) HealthCheck(ctx context.Context) error {
 	return nil
+}
+
+func (dao *InMemoryProductPricesDAO) Close() {
 }
 
 func NewInMemoryProductPricesDAO() *InMemoryProductPricesDAO {

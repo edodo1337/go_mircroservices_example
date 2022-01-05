@@ -38,3 +38,7 @@ func NewStorageService(
 		logger:                 logger,
 	}
 }
+
+func (s *StorageService) Close() {
+	close(s.transactionsPipe)
+}

@@ -63,7 +63,50 @@ func (dao *PostgresOrdersDAO) GetListByUserID(ctx context.Context, userID uint) 
 }
 
 func (dao *PostgresOrdersDAO) GetByID(ctx context.Context, orderID uint) (*models.Order, error) {
-	panic("not implemented")
+	var order models.Order
+
+	err := dao.db.QueryRow(
+		ctx,
+		"get_order_by_id",
+		orderID,
+	).Scan(
+		&order.ID,
+		&order.UserID,
+		&order.Status,
+		&order.RejectedReason,
+		&order.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := dao.db.Query(ctx, "get_order_items_by_order_id", orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]*models.OrderItem, 0, 10)
+
+	for rows.Next() {
+		var item models.OrderItem
+
+		err = rows.Scan(
+			&item.ID,
+			&item.OrderID,
+			&item.ProductID,
+			&item.Count,
+			&item.ProductPrice,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		items = append(items, &item)
+	}
+
+	order.OrderItems = items
+
+	return &order, err
 }
 
 func (dao *PostgresOrdersDAO) Delete(ctx context.Context, orderID uint) error {
@@ -80,7 +123,7 @@ func (dao *PostgresOrdersDAO) UpdateStatus(
 ) (*models.Order, error) {
 	var order models.Order
 
-	err := dao.db.QueryRow(ctx, "update_order_status", status, orderID).Scan(
+	err := dao.db.QueryRow(ctx, "update_order_status", status, orderID, reasonCode).Scan(
 		&order.ID,
 		&order.UserID,
 		&order.Status,
@@ -97,6 +140,10 @@ func (dao *PostgresOrdersDAO) HealthCheck(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (dao *PostgresOrdersDAO) Close() {
+	dao.db.Close()
 }
 
 func NewPostgresOrdersDAO(ctx context.Context, config *conf.Config) *PostgresOrdersDAO {
@@ -117,26 +164,20 @@ func NewPostgresOrdersDAO(ctx context.Context, config *conf.Config) *PostgresOrd
 			RETURNING id, user_id, status, rejected_reason, created_at;`,
 		"orders_list_by_user_id": `SELECT id, user_id, status, 
 			rejected_reason, created_at FROM orders WHERE user_id=$1::bigint;`,
-		"update_order_status": `UPDATE orders SET status=$1::smallint 
+		"get_order_by_id": `SELECT id, user_id, status, rejected_reason, created_at
+			FROM orders
+			WHERE id=$1::bigint;`,
+		"get_order_items_by_order_id": `SELECT id, order_id, product_id, count, product_price
+			FROM order_items
+			WHERE order_id=$1::bigint;`,
+		"update_order_status": `UPDATE orders 
+			SET status=$1::smallint, rejected_reason=$3::smallint 
 			WHERE id=$2::bigint 
 			returning id, user_id, status, rejected_reason, created_at;`,
 		"delete_order": `DELETE FROM orders WHERE id=$1::bigint;`,
 	}
 
-	tx, err := dbConn.Begin(ctx)
-	if err != nil {
-		panic(err)
-	}
-
-	for k, v := range queriesMap {
-		if _, err := tx.Prepare(ctx, k, v); err != nil {
-			panic(err)
-		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		panic(err)
-	}
+	submitPreparedStatements(ctx, queriesMap, dbConn)
 
 	return &PostgresOrdersDAO{
 		db:          dbConn,
@@ -174,8 +215,6 @@ func (dao *PostgresOrderItemsDAO) CreateBulk(
 	}
 
 	query.WriteString(" RETURNING id, order_id, product_id, count, product_price;")
-
-	fmt.Println("query", query.String())
 
 	rows, err := dao.db.Query(ctx, query.String())
 	if err != nil {
@@ -239,9 +278,6 @@ func NewPostgresOrderItemsDAO(ctx context.Context, config *conf.Config) *Postgre
 	queriesMap := map[string]string{
 		"orders_list_by_user_id": `SELECT id, user_id, status, 
 			rejected_reason, created_at FROM orders WHERE user_id=$1::bigint;`,
-		"update_order_status": `UPDATE orders SET status=$1::smallint 
-			WHERE id=$2::bigint 
-			returning id, user_id, status, rejected_reason, created_at;`,
 		"delete_order": `DELETE FROM orders WHERE id=$1::bigint;`,
 	}
 
@@ -251,6 +287,10 @@ func NewPostgresOrderItemsDAO(ctx context.Context, config *conf.Config) *Postgre
 		db:              dbConn,
 		orderItemsTable: config.RegistryDatabase.OrderItemsTable,
 	}
+}
+
+func (dao *PostgresOrderItemsDAO) Close() {
+	dao.db.Close()
 }
 
 // ---------------------------- ProductPricesDAO----------------------------
@@ -322,6 +362,10 @@ func (dao *PostgresProductPricesDAO) HealthCheck(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (dao *PostgresProductPricesDAO) Close() {
+	dao.db.Close()
 }
 
 func NewPostgresProductPricesDAO(ctx context.Context, config *conf.Config) *PostgresProductPricesDAO {

@@ -71,7 +71,7 @@ func (s *Server) CreateOrder() http.Handler {
 			OrderItems: orderItems,
 		}
 
-		err := s.App.OrdersService.MakeOrder(r.Context(), *makeOrderData)
+		err := s.App.OrdersService.MakeOrder(r.Context(), makeOrderData)
 		if err != nil {
 			JSONResponse(w, err.Error(), http.StatusBadRequest)
 

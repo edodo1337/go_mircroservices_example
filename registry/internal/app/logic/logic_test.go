@@ -47,7 +47,7 @@ func TestMakeOrder(t *testing.T) {
 
 	stop := make(chan struct{})
 	go func(stop chan struct{}) {
-		service.NewOrdersPipeline(ctx)
+		service.EventPipeProcessor(ctx)
 		stop <- struct{}{}
 	}(stop)
 
@@ -61,7 +61,7 @@ func TestMakeOrder(t *testing.T) {
 		},
 	}
 
-	if err := service.MakeOrder(ctx, *makeOrderData); err != nil {
+	if err := service.MakeOrder(ctx, makeOrderData); err != nil {
 		t.Error("make order error", err)
 	}
 
@@ -98,13 +98,7 @@ func TestMakeOrderWithKafka(t *testing.T) {
 	orderDAO := db.NewInMemoryOrdersDAO()
 	orderItemsDAO := db.NewInMemoryOrderItemsDAO()
 	productPricesDAO := db.NewInMemoryProductPricesDAO()
-	brokerClient, err := broker.NewKafkaClient(
-		config.Kafka.Brokers,
-		config.Kafka.NewOrdersTopic,
-		config.Kafka.RejectedOrdersTopic,
-		config.Kafka.SuccessTopic,
-		config.Kafka.GroupID,
-	)
+	brokerClient, err := broker.NewKafkaClient(config)
 	if err != nil {
 		t.Error("create kafka client err", err)
 	}
@@ -119,7 +113,7 @@ func TestMakeOrderWithKafka(t *testing.T) {
 
 	stop := make(chan struct{})
 	go func(stop chan struct{}) {
-		service.NewOrdersPipeline(ctx)
+		service.EventPipeProcessor(ctx)
 		stop <- struct{}{}
 	}(stop)
 
@@ -133,7 +127,7 @@ func TestMakeOrderWithKafka(t *testing.T) {
 		},
 	}
 
-	if err := service.MakeOrder(ctx, *makeOrderData); err != nil {
+	if err := service.MakeOrder(ctx, makeOrderData); err != nil {
 		t.Error("make order error", err)
 	}
 
@@ -172,13 +166,7 @@ func TestMakeOrderWithKafkaAndConsumeRejected(t *testing.T) {
 	orderDAO := db.NewInMemoryOrdersDAO()
 	orderItemsDAO := db.NewInMemoryOrderItemsDAO()
 	productPricesDAO := db.NewInMemoryProductPricesDAO()
-	brokerClient, err := broker.NewKafkaClient(
-		config.Kafka.Brokers,
-		config.Kafka.NewOrdersTopic,
-		config.Kafka.RejectedOrdersTopic,
-		config.Kafka.SuccessTopic,
-		config.Kafka.GroupID,
-	)
+	brokerClient, err := broker.NewKafkaClient(config)
 	if err != nil {
 		t.Error("create kafka client err", err)
 	}
@@ -194,7 +182,7 @@ func TestMakeOrderWithKafkaAndConsumeRejected(t *testing.T) {
 
 	stop := make(chan struct{})
 	go func(stop chan struct{}) {
-		service.NewOrdersPipeline(ctx)
+		service.EventPipeProcessor(ctx)
 		stop <- struct{}{}
 	}(stop)
 
@@ -213,7 +201,7 @@ func TestMakeOrderWithKafkaAndConsumeRejected(t *testing.T) {
 		},
 	}
 
-	if err := service.MakeOrder(ctx, *makeOrderData); err != nil {
+	if err := service.MakeOrder(ctx, makeOrderData); err != nil {
 		t.Error("make order error", err)
 	}
 

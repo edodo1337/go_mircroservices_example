@@ -101,6 +101,10 @@ func (dao *PostgresStorageItemsDAO) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
+func (dao *PostgresStorageItemsDAO) Close() {
+	dao.db.Close()
+}
+
 func NewPostgresStorageItemsDAO(ctx context.Context, config *conf.Config) *PostgresStorageItemsDAO {
 	dbConn := GetPostgresConnection(ctx, config.WalletDatabaseURI())
 
@@ -270,6 +274,10 @@ func (dao *PostgresTransactionsDAO) HealthCheck(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (dao *PostgresTransactionsDAO) Close() {
+	dao.db.Close()
 }
 
 func NewPostgresStorageTransDAO(ctx context.Context, config *conf.Config) *PostgresTransactionsDAO {

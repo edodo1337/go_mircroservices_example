@@ -30,6 +30,7 @@ kafka:
   internal_clients_port: 9093
   brokers: ["services_kafka:9093"]
   # brokers: ["localhost:9093"]
+  max_wait: 200
   send_msg_timeout: 5
   consume_loop_tick: 500
   

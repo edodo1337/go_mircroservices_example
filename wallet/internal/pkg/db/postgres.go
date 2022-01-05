@@ -51,6 +51,10 @@ func (dao *PostgresWalletsDAO) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
+func (dao *PostgresWalletsDAO) Close() {
+	dao.db.Close()
+}
+
 func NewPostgresWalletsDAO(ctx context.Context, config *conf.Config) *PostgresWalletsDAO {
 	dbConn := GetPostgresConnection(ctx, config.WalletDatabaseURI())
 
@@ -133,6 +137,10 @@ func (dao *PostgresTransactionsDAO) HealthCheck(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (dao *PostgresTransactionsDAO) Close() {
+	dao.db.Close()
 }
 
 func NewPostgresWalletTransDAO(ctx context.Context, config *conf.Config) *PostgresTransactionsDAO {
