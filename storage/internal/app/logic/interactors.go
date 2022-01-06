@@ -80,7 +80,7 @@ func (s *StorageService) MakeCancelation(
 }
 
 func (s *StorageService) EventPipeProcessor(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Done()
+	defer wg.Done()
 
 	for {
 		select {
@@ -126,7 +126,7 @@ func (s *StorageService) EventPipeProcessor(ctx context.Context, wg *sync.WaitGr
 }
 
 func (s *StorageService) ConsumeNewOrderMsgLoop(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Done()
+	defer wg.Done()
 
 	ticker := time.NewTicker(s.consumeLoopTick)
 
