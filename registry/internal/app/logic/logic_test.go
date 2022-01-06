@@ -6,6 +6,7 @@ import (
 	"registry_service/internal/pkg/broker"
 	"registry_service/internal/pkg/conf"
 	"registry_service/internal/pkg/db"
+	"sync"
 	"testing"
 	"time"
 
@@ -45,9 +46,11 @@ func TestMakeOrder(t *testing.T) {
 		config,
 	)
 
+	wg := sync.WaitGroup{}
+
 	stop := make(chan struct{})
 	go func(stop chan struct{}) {
-		service.EventPipeProcessor(ctx)
+		service.EventPipeProcessor(ctx, &wg)
 		stop <- struct{}{}
 	}(stop)
 
@@ -67,6 +70,7 @@ func TestMakeOrder(t *testing.T) {
 
 	cancel()
 	<-stop
+	wg.Wait()
 
 	if len(orderDAO.OrdersKVStore) == 0 {
 		t.Error("empty orders")
@@ -111,9 +115,11 @@ func TestMakeOrderWithKafka(t *testing.T) {
 		config,
 	)
 
+	wg := sync.WaitGroup{}
+
 	stop := make(chan struct{})
 	go func(stop chan struct{}) {
-		service.EventPipeProcessor(ctx)
+		service.EventPipeProcessor(ctx, &wg)
 		stop <- struct{}{}
 	}(stop)
 
@@ -135,6 +141,7 @@ func TestMakeOrderWithKafka(t *testing.T) {
 	time.Sleep(3 * time.Second)
 	cancel()
 	<-stop
+	wg.Wait()
 
 	if len(orderDAO.OrdersKVStore) == 0 {
 		t.Error("empty orders")
@@ -180,14 +187,16 @@ func TestMakeOrderWithKafkaAndConsumeRejected(t *testing.T) {
 		config,
 	)
 
+	wg := sync.WaitGroup{}
+
 	stop := make(chan struct{})
 	go func(stop chan struct{}) {
-		service.EventPipeProcessor(ctx)
+		service.EventPipeProcessor(ctx, &wg)
 		stop <- struct{}{}
 	}(stop)
 
 	go func(stop chan struct{}) {
-		go service.ConsumeRejectedOrderMsgLoop(ctx)
+		go service.ConsumeRejectedOrderMsgLoop(ctx, &wg)
 		stop <- struct{}{}
 	}(stop)
 
@@ -210,6 +219,7 @@ func TestMakeOrderWithKafkaAndConsumeRejected(t *testing.T) {
 	cancel()
 	<-stop
 	<-stop
+	wg.Wait()
 
 	if len(orderDAO.OrdersKVStore) == 0 {
 		t.Error("empty orders")

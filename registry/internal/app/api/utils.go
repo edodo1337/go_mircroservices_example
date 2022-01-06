@@ -8,6 +8,7 @@ import (
 	_ "registry_service/docs"
 	"registry_service/internal/app/registry"
 	"registry_service/internal/pkg/log"
+	"sync"
 
 	"github.com/gorilla/mux"
 
@@ -39,22 +40,30 @@ func NewServer(app *registry.App) *Server {
 
 func (s *Server) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
-	go s.App.OrdersService.EventPipeProcessor(ctx)
-	go s.App.OrdersService.ConsumeRejectedOrderMsgLoop(ctx)
-	go s.App.OrdersService.ConsumeSuccessMsgLoop(ctx)
+	wg := sync.WaitGroup{}
+	wg.Add(3)
+
+	go s.App.OrdersService.EventPipeProcessor(ctx, &wg)
+	go s.App.OrdersService.ConsumeRejectedOrderMsgLoop(ctx, &wg)
+	go s.App.OrdersService.ConsumeSuccessMsgLoop(ctx, &wg)
 
 	if err := s.Serv.ListenAndServe(); err != nil {
+		cancel()
+		wg.Wait()
+
 		return err
 	}
+
+	cancel()
+	wg.Wait()
 
 	return nil
 }
 
 func (s *Server) Shutdown() {
-	s.App.Close()
 	s.Serv.Close()
+	s.App.Close()
 }
 
 func createRouter(s *Server) *mux.Router {

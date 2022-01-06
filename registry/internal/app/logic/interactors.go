@@ -4,6 +4,7 @@ import (
 	"context"
 	in "registry_service/internal/app/interfaces"
 	"registry_service/internal/app/models"
+	"sync"
 	"time"
 )
 
@@ -75,7 +76,7 @@ func (s *OrdersService) MakeCancelation(
 		return nil
 	}
 
-	s.logger.Info("Making cancelation success")
+	s.logger.Info("Making cancelation: send msg to chan success")
 
 	return nil
 }
@@ -96,7 +97,7 @@ func (s *OrdersService) MarkSuccessStep(
 		return nil
 	}
 
-	s.logger.Info("Making cancelation success")
+	s.logger.Info("Making cancelation: send msg to chan success")
 
 	return nil
 }
@@ -106,7 +107,10 @@ func (s *OrdersService) MarkSuccessStep(
 // and processes new order, cancelation and success msg.
 func (s *OrdersService) EventPipeProcessor(
 	ctx context.Context,
+	wg *sync.WaitGroup,
 ) {
+	defer wg.Done()
+
 	for {
 		select {
 		case orderData, ok := <-s.newOrdersPipe:
@@ -148,36 +152,45 @@ func (s *OrdersService) EventPipeProcessor(
 	}
 }
 
-func (s *OrdersService) ConsumeRejectedOrderMsgLoop(ctx context.Context) {
+func (s *OrdersService) ConsumeRejectedOrderMsgLoop(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	ticker := time.NewTicker(s.consumeLoopTick)
 
 	for {
 		select {
 		case <-ticker.C:
 			msg, err := s.brokerClient.GetOrderRejectedMsg(ctx)
-			if err == nil {
-				if msg.Service == in.Registry {
-					s.logger.Info("Got message for registry. Skip")
-
-					continue
-				}
-
-				s.logger.Info("Kafka rejected order msg: ", msg)
-
-				errCancel := s.MakeCancelation(ctx, msg)
-				if errCancel != nil {
-					s.logger.Errorf("Order cancelation error: %v", errCancel)
-				}
-			} else {
+			if err != nil {
 				s.logger.Error("got order rejected msg err: ", err)
 			}
+
+			if msg == nil {
+				continue
+			}
+
+			if msg.Service == in.Registry {
+				s.logger.Info("Got message for registry. Skip")
+
+				continue
+			}
+
+			s.logger.Info("Kafka rejected order msg: ", msg)
+
+			errCancel := s.MakeCancelation(ctx, msg)
+			if errCancel != nil {
+				s.logger.Errorf("Order cancelation error: %v", errCancel)
+			}
+
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (s *OrdersService) ConsumeSuccessMsgLoop(ctx context.Context) {
+func (s *OrdersService) ConsumeSuccessMsgLoop(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	ticker := time.NewTicker(s.consumeLoopTick)
 
 	for {
@@ -186,6 +199,10 @@ func (s *OrdersService) ConsumeSuccessMsgLoop(ctx context.Context) {
 			msg, err := s.brokerClient.GetSuccessMsg(ctx)
 			if err != nil {
 				s.logger.Error("Error get success order msg from kafka: ", err)
+			}
+
+			if msg == nil {
+				continue
 			}
 
 			s.logger.Info("New success order msg", msg)

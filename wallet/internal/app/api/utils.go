@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	_ "wallet_service/docs"
 	"wallet_service/internal/app/wallet"
 	"wallet_service/internal/pkg/log"
@@ -39,15 +40,23 @@ func NewServer(app *wallet.App) *Server {
 
 func (s *Server) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
-	go s.App.PaymentService.ConsumeNewOrderMsgLoop(ctx)
-	go s.App.PaymentService.ConsumeRejectedOrderMsgLoop(ctx)
-	go s.App.PaymentService.EventPipeProcessor(ctx)
+	wg := sync.WaitGroup{}
+	wg.Add(3)
+
+	go s.App.PaymentService.ConsumeNewOrderMsgLoop(ctx, &wg)
+	go s.App.PaymentService.ConsumeRejectedOrderMsgLoop(ctx, &wg)
+	go s.App.PaymentService.EventPipeProcessor(ctx, &wg)
 
 	if err := s.Serv.ListenAndServe(); err != nil {
+		cancel()
+		wg.Wait()
+
 		return err
 	}
+
+	cancel()
+	wg.Wait()
 
 	return nil
 }

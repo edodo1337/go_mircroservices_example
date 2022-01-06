@@ -5,6 +5,7 @@ import (
 	"errors"
 	in "storage_service/internal/app/interfaces"
 	"storage_service/internal/app/models"
+	"sync"
 	"time"
 )
 
@@ -36,7 +37,7 @@ func (s *StorageService) MakeReservation(
 		return in.ErrNewTransactionTimeoutError
 	}
 
-	s.logger.Info("Reservation success")
+	s.logger.Info("Reservation: send msg to chan success")
 
 	return nil
 }
@@ -73,12 +74,14 @@ func (s *StorageService) MakeCancelation(
 		return in.ErrNewTransactionTimeoutError
 	}
 
-	s.logger.Info("Cancelation success")
+	s.logger.Info("Cancelation: send msg to chan success")
 
 	return nil
 }
 
-func (s *StorageService) EventPipeProcessor(ctx context.Context) {
+func (s *StorageService) EventPipeProcessor(ctx context.Context, wg *sync.WaitGroup) {
+	wg.Done()
+
 	for {
 		select {
 		case trans, ok := <-s.transactionsPipe:
@@ -122,36 +125,42 @@ func (s *StorageService) EventPipeProcessor(ctx context.Context) {
 	}
 }
 
-func (s *StorageService) ConsumeNewOrderMsgLoop(ctx context.Context) {
+func (s *StorageService) ConsumeNewOrderMsgLoop(ctx context.Context, wg *sync.WaitGroup) {
+	wg.Done()
+
 	ticker := time.NewTicker(s.consumeLoopTick)
 
 	for {
 		select {
 		case <-ticker.C:
 			msg, err := s.brokerClient.GetNewOrderMsg(ctx)
-			if err == nil {
-				s.logger.Debug("Kafka new order msg: ", msg)
-
-				orderItemsData := make([]*in.OrderItemDTO, 0, 10)
-				for _, v := range msg.OrderItems {
-					orderItemsData = append(orderItemsData, &in.OrderItemDTO{
-						ProductID:    v.ProductID,
-						Count:        uint16(v.Count),
-						ProductPrice: v.ProductPrice,
-					})
-				}
-
-				orderData := in.OrderDTO{
-					OrderID:    msg.OrderID,
-					UserID:     msg.UserID,
-					OrderItems: orderItemsData,
-				}
-
-				if purchaseErr := s.MakeReservation(ctx, &orderData); purchaseErr != nil {
-					s.logger.Error("new order make purchase err: ", purchaseErr)
-				}
-			} else {
+			if err != nil {
 				s.logger.Error("got new order msg err: ", err)
+			}
+
+			if msg == nil {
+				continue
+			}
+
+			s.logger.Debug("Kafka new order msg: ", msg)
+
+			orderItemsData := make([]*in.OrderItemDTO, 0, 10)
+			for _, v := range msg.OrderItems {
+				orderItemsData = append(orderItemsData, &in.OrderItemDTO{
+					ProductID:    v.ProductID,
+					Count:        uint16(v.Count),
+					ProductPrice: v.ProductPrice,
+				})
+			}
+
+			orderData := in.OrderDTO{
+				OrderID:    msg.OrderID,
+				UserID:     msg.UserID,
+				OrderItems: orderItemsData,
+			}
+
+			if purchaseErr := s.MakeReservation(ctx, &orderData); purchaseErr != nil {
+				s.logger.Error("new order make purchase err: ", purchaseErr)
 			}
 		case <-ctx.Done():
 			return
@@ -159,32 +168,38 @@ func (s *StorageService) ConsumeNewOrderMsgLoop(ctx context.Context) {
 	}
 }
 
-func (s *StorageService) ConsumeRejectedOrderMsgLoop(ctx context.Context) {
+func (s *StorageService) ConsumeRejectedOrderMsgLoop(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	ticker := time.NewTicker(s.consumeLoopTick)
 
 	for {
 		select {
 		case <-ticker.C:
 			msg, err := s.brokerClient.GetOrderRejectedMsg(ctx)
-			if err == nil {
-				s.logger.Debug("Kafka rejected order msg: ", msg)
-
-				if msg.Service == in.Storage {
-					s.logger.Info("Got message for storage. Skip")
-
-					continue
-				}
-
-				cancelOrderData := &in.CancelOrderDTO{
-					OrderID: msg.OrderID,
-					UserID:  msg.UserID,
-				}
-
-				if cancelErr := s.MakeCancelation(ctx, *cancelOrderData); cancelErr != nil {
-					s.logger.Error("rejected order update err: ", cancelErr)
-				}
-			} else {
+			if err != nil {
 				s.logger.Error("get order rejected msg err: ", err)
+			}
+
+			if msg == nil {
+				continue
+			}
+
+			s.logger.Debug("Kafka rejected order msg: ", msg)
+
+			if msg.Service == in.Storage {
+				s.logger.Info("Got message for storage. Skip")
+
+				continue
+			}
+
+			cancelOrderData := &in.CancelOrderDTO{
+				OrderID: msg.OrderID,
+				UserID:  msg.UserID,
+			}
+
+			if cancelErr := s.MakeCancelation(ctx, *cancelOrderData); cancelErr != nil {
+				s.logger.Error("rejected order update err: ", cancelErr)
 			}
 		case <-ctx.Done():
 			return

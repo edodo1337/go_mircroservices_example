@@ -8,6 +8,7 @@ import (
 	_ "storage_service/docs"
 	"storage_service/internal/app/storage"
 	"storage_service/internal/pkg/log"
+	"sync"
 
 	"github.com/gorilla/mux"
 
@@ -39,15 +40,23 @@ func NewServer(app *storage.App) *Server {
 
 func (s *Server) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
-	go s.App.StorageService.ConsumeNewOrderMsgLoop(ctx)
-	go s.App.StorageService.ConsumeRejectedOrderMsgLoop(ctx)
-	go s.App.StorageService.EventPipeProcessor(ctx)
+	wg := sync.WaitGroup{}
+	wg.Add(3)
+
+	go s.App.StorageService.ConsumeNewOrderMsgLoop(ctx, &wg)
+	go s.App.StorageService.ConsumeRejectedOrderMsgLoop(ctx, &wg)
+	go s.App.StorageService.EventPipeProcessor(ctx, &wg)
 
 	if err := s.Serv.ListenAndServe(); err != nil {
+		cancel()
+		wg.Wait()
+
 		return err
 	}
+
+	cancel()
+	wg.Wait()
 
 	return nil
 }
