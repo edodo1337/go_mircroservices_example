@@ -331,6 +331,7 @@ func (dao *PostgresProductPricesDAO) GetMap(ctx context.Context, productIDs []ui
 }
 
 func (dao *PostgresProductPricesDAO) GetList(ctx context.Context) ([]*models.Product, error) {
+	// В этом методе чего-то не хватает.
 	rows, err := dao.db.Query(ctx, "products_list")
 	if err != nil {
 		return nil, err

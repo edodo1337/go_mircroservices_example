@@ -24,6 +24,9 @@ type App struct {
 }
 
 func NewRegistryApp(ctx context.Context) *App {
+	// Я бы передавал логгер и конфигурацию через аргументы.
+	// Что ты думаешь об этом? Есть ли разница в этих подходах?
+	// Proc and cons этих подходов.
 	config := conf.New()
 	logger := logrus.New()
 	// logger.SetFormatter(&logrus.JSONFormatter{})
@@ -32,11 +35,14 @@ func NewRegistryApp(ctx context.Context) *App {
 		parseLogLevel(config.Logger.LogLevel),
 	)
 
+	// Плохая идея передавать так конфиг в клиент кафки и другие клиенты ниже.
+	// Как ты думаешь, какие аргументы у меня могут быть, чтобы это говорить?
 	brokerClient, err := broker.NewKafkaClient(config)
 	if err != nil {
 		panic(err)
 	}
 
+	// Закоментированный код. Ай-ай-ай)
 	// brokerClient := broker.NewInMemoryBrokerClient()
 	// ordersDAO := db.NewInMemoryOrdersDAO()
 	// orderItemsDAO := db.NewInMemoryOrderItemsDAO()
@@ -70,6 +76,8 @@ func NewRegistryApp(ctx context.Context) *App {
 
 func (app *App) Close() {
 	app.OrdersService.Close()
+	// Не логируется ошибка. Но метод всегда возвращает nil в ошибке.
+	// Ай-ай-ай)
 	app.BrokerClient.CloseReader()
 	app.BrokerClient.CloseWriter()
 	app.OrdersDAO.Close()

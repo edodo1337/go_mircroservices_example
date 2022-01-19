@@ -79,6 +79,7 @@ func (c *Config) RegistryDatabaseURI() string {
 		c.RegistryDatabase.Password,
 		c.RegistryDatabase.Host,
 		c.RegistryDatabase.Port,
+		// Зачем нужна эта функция?
 		c.RegistryDatabaseDBName(),
 	)
 }
