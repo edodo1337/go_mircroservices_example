@@ -3,5 +3,19 @@
         {
             "path": "."
         }
-    ]
+    ],
+    "settings": {
+        "sqltools.connections": [
+            {
+                "previewLimit": 50,
+                "server": "localhost",
+                "port": 5432,
+                "driver": "PostgreSQL",
+                "name": "5432",
+                "username": "user",
+                "password": "password",
+                "database": "mydb"
+            }
+        ]
+    }
 }
