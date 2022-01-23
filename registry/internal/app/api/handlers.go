@@ -52,6 +52,7 @@ func (s *Server) CreateOrder() http.Handler {
 		}
 
 		if errs := validator.Validate(orderData); errs != nil {
+			// Хм, кажется, что message здесь не очень точен
 			msg := ErrResponseMsg{Message: "Empty body"}
 			JSONResponse(w, msg, http.StatusBadRequest)
 
@@ -73,6 +74,8 @@ func (s *Server) CreateOrder() http.Handler {
 
 		err := s.App.OrdersService.MakeOrder(r.Context(), makeOrderData)
 		if err != nil {
+			// Тут код ошибки всегла один и тот же.
+			// Не стоит переписывать, но просто хочется послушать твои рассуждения о том, как правильно отдавать ощибки наружу
 			JSONResponse(w, err.Error(), http.StatusBadRequest)
 
 			return
@@ -189,6 +192,7 @@ func (s *Server) HealthCheck() http.Handler {
 			return "ok"
 		}
 
+		// Можешь, пожалуйста, объяснить, что здесь происходит в этих 4х строчках?
 		ordersDAOHealth := errToStr(s.App.OrdersDAO.HealthCheck(ctx))
 		orderItemsDAOHealth := errToStr(s.App.OrderItemsDAO.HealthCheck(ctx))
 		productPricesDAOHealth := errToStr(s.App.ProductPricesDAO.HealthCheck(ctx))

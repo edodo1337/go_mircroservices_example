@@ -150,6 +150,7 @@ func (s *OrdersService) processNewOrder(
 
 	order.OrderItems = orderItems
 
+	// Что произойдёт, если здесь сервис будет перезапущен по какой-то причине?
 	err = s.sendNewOrderMsg(ctx, order)
 	if err != nil {
 		_, errUpd := s.ordersDAO.UpdateStatus(
