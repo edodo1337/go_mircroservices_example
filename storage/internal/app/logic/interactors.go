@@ -86,38 +86,18 @@ func (s *StorageService) EventPipeProcessor(ctx context.Context, wg *sync.WaitGr
 		select {
 		case trans, ok := <-s.transactionsPipe:
 			if !ok {
-				return
+				continue
 			}
 
 			switch trans.Type {
 			case models.Reservation:
-				code, err := s.processReservation(ctx, trans)
-				if err != nil {
-					s.logger.Error("got process reservation error: ", err, code)
+				go s.reservationProcessor(ctx, trans)
 
-					trans.Type = models.Cancelation
-					s.transactionsPipe <- trans
-
-					errSend := s.sendRejectedMsg(ctx, code, trans)
-					if errSend != nil {
-						s.logger.Error("send rejected msg error: ", errSend)
-					}
-				}
-
-				errSend := s.sendSuccessMsg(ctx, trans)
-				if errSend != nil {
-					s.logger.Error("send success msg error: ", errSend)
-				}
 			case models.Cancelation:
-				err := s.processCancelation(ctx, trans)
-				if err != nil {
-					s.logger.Error("got process cancellation error: ", err)
-				}
-			default:
-				s.logger.Error("Invalid transaction type")
+				go s.cancelationProcessor(ctx, trans)
 
-				trans.Type = models.Cancelation
-				s.transactionsPipe <- trans
+			default:
+				go s.invalidTransProcessor(trans)
 			}
 		case <-ctx.Done():
 			return

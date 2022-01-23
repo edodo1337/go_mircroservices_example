@@ -115,37 +115,22 @@ func (s *OrdersService) EventPipeProcessor(
 		select {
 		case orderData, ok := <-s.newOrdersPipe:
 			if !ok {
-				return
+				continue
 			}
 
-			s.logger.Info("New order data: ", *orderData)
-
-			err := s.processNewOrder(ctx, orderData)
-			if err != nil {
-				s.logger.Error("Err process order: ", err)
-			}
+			go s.newOrderProcessor(ctx, orderData)
 		case cancelData, ok := <-s.rejectedOrdersPipe:
 			if !ok {
-				return
+				continue
 			}
 
-			s.logger.Info("New cancelation data: ", *cancelData)
-
-			err := s.processCancelation(ctx, cancelData)
-			if err != nil {
-				s.logger.Error("Err process cancelation: ", err)
-			}
+			go s.rejectedOrderProcessor(ctx, cancelData)
 		case successData, ok := <-s.successOrdersPipe:
 			if !ok {
-				return
+				continue
 			}
 
-			s.logger.Info("New success order data: ", *successData)
-
-			err := s.processSuccess(ctx, successData)
-			if err != nil {
-				s.logger.Error("Err process success order: ", err)
-			}
+			go s.successOrderProcessor(ctx, successData)
 		case <-ctx.Done():
 			return
 		}
