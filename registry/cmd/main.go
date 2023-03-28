@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx := context.Background() // test comment
 	app := reg.NewRegistryApp(ctx)
 	s := api.NewServer(app)
 
